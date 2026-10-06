@@ -22,9 +22,10 @@ def vendoredLibraries = [
         // Nalim 1.2.1-patched-autoinline, built from ../nalim (one.nalim.*).
         [file: file('libs/nalim.jar'),
          sha256: '069ca95d85681156de69c105ed4eb08366bb92017fb619a58eb8fc8d743651bb'],
-        // Fabrolia classes Rustmi compiles against; Fabrolia stays an optional runtime mod.
+        // Fabrolia classes Rustmi compiles against (= ../Fabrolia/release/fabrolia-fabric-
+        // 0.2.38+alpha-26.3.jar of 2026-10-06); Fabrolia stays an optional runtime mod.
         [file: file('libs/fabrolia-compile.jar'),
-         sha256: '747d295cd698c266d8490af5c3da0b3a0902188de877f96b0e20ee341eb1856e']
+         sha256: '25b00a027f20965fa92aa25034e1a6e1a311ad9582c698d91c40f5e87a6bd516']
 ]
 
 tasks.register('verifyVendoredLibraries') {
