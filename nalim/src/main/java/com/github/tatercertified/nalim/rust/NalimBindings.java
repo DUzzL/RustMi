@@ -106,7 +106,7 @@ public final class NalimBindings {
     @Link(name = "oxi_cramming_query")
     public static native int oxi_cramming_query(long handle, int slot, long outAddr, int outCap);
 
-    // ── R2 redstone shadow engine ───────────────────────────────────────
+    // ── Redstone wire cascade replay (CascadeEngine, CascadeShadow) ─────
 
     /** Retain a marshalled wire network (7-i32 node records + flat i32 edge
      *  indices) under {@code handle}. 0 on success, -1 on bad input. */
@@ -126,61 +126,6 @@ public final class NalimBindings {
     /** Drop the retention. */
     @Link(name = "oxi_redstone_end")
     public static native void oxi_redstone_end(long handle);
-
-    // Redpiler uses a packed node descriptor to stay within every supported
-    // native calling convention's integer-register budget.
-    @Link(name = "oxi_redpiler_create")
-    public static native int oxi_redpiler_create(long handle);
-
-    @Link(name = "oxi_redpiler_destroy")
-    public static native int oxi_redpiler_destroy(long handle);
-
-    @Link(name = "oxi_redpiler_add_node")
-    public static native int oxi_redpiler_add_node(long handle, long packedNode);
-
-    @Link(name = "oxi_redpiler_node_add_block")
-    public static native int oxi_redpiler_node_add_block(
-            long handle, int nodeIdx, int x, int y, int z, int blockId);
-
-    @Link(name = "oxi_redpiler_add_edge")
-    public static native int oxi_redpiler_add_edge(
-            long handle, int from, int to, byte side, byte signalStrength);
-
-    @Link(name = "oxi_redpiler_compile")
-    public static native int oxi_redpiler_compile(long handle);
-
-    @Link(name = "oxi_redpiler_warmup")
-    public static native int oxi_redpiler_warmup(long handle);
-
-    @Link(name = "oxi_redpiler_schedule_tick")
-    public static native int oxi_redpiler_schedule_tick(
-            long handle, int nodeIdx, int delay, byte priority);
-
-    @Link(name = "oxi_redpiler_set_input")
-    public static native int oxi_redpiler_set_input(
-            long handle, int nodeIdx, byte powered, byte power);
-
-    @Link(name = "oxi_redpiler_tick")
-    public static native int oxi_redpiler_tick(long handle);
-
-    @Link(name = "oxi_redpiler_drain_changes")
-    public static native int oxi_redpiler_drain_changes(long handle, long outAddr, int outCap);
-
-    @Link(name = "oxi_redpiler_drain_pending_ticks")
-    public static native int oxi_redpiler_drain_pending_ticks(long handle, long outAddr, int outCap);
-
-    @Link(name = "oxi_redpiler_drain_events")
-    public static native int oxi_redpiler_drain_events(long handle, long outAddr, int outCap);
-
-    @Link(name = "oxi_redpiler_mark_torch_burnt")
-    public static native int oxi_redpiler_mark_torch_burnt(
-            long handle, int nodeIdx, int ageTicks);
-
-    @Link(name = "oxi_redpiler_drain_burnouts")
-    public static native int oxi_redpiler_drain_burnouts(long handle, long outAddr, int outCap);
-
-    @Link(name = "oxi_redpiler_lookup_pos")
-    public static native int oxi_redpiler_lookup_pos(long handle, int x, int y, int z);
 
     /** Palette-packed sweep (128 B header v2, skip-air split; air triples
      *  land backwards from the out tail, count in header[96]). */
@@ -224,32 +169,6 @@ public final class NalimBindings {
     @Critical
     @Link(name = "oxi_section_stats")
     public static native void oxi_section_stats(long outAddr);
-
-    /** Chunk-section packet encoder. One call per chunk column.
-     *  <ul>
-     *   <li>{@code headerAddr} — {@code [i32 nSections]}</li>
-     *   <li>{@code sectionsAddr} — {@code nSections * 64} bytes (see
-     *       {@link com.github.tatercertified.nalim.chunk.ChunkSectionPacketEncoder#SECTION_STRIDE})</li>
-     *   <li>{@code paletteIdsAddr} — flat {@code i32} global ids referenced by
-     *       each container's {@code (palOff, palCount)}</li>
-     *   <li>{@code outAddr} — destination wire bytes (vanilla
-     *       {@code ClientboundLevelChunkPacketData} section buffer)</li>
-     *   <li>{@code outCap} — capacity of {@code outAddr}</li>
-     *  </ul>
-     *  Returns total bytes written ({@code >= 0}), or {@code -1} on validation
-     *  failure / unsupported record / {@code outCap} too small (validate-before-
-     *  write — nothing is written on {@code -1}). */
-    @Link(name = "oxi_chunk_section_encode")
-    public static native int oxi_chunk_section_encode(long headerAddr, long sectionsAddr,
-                                                       long paletteIdsAddr, long outAddr, int outCap);
-
-    /** Packed section-record stride, for a runtime cross-check against Java's
-     *  {@code SECTION_STRIDE}. */
-    @Critical
-    @Link(name = "oxi_chunk_section_record_size")
-    public static native int oxi_chunk_section_record_size();
-
-
 
     // ===== Mob-cap arena (util::spawncap) — pointers passed as long addresses (addressOf).
     /** Build the per-tick arena from marshalled entity + player records. @return handle, 0 on bad args. */

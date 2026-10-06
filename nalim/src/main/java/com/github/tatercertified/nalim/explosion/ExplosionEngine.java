@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -65,23 +64,20 @@ import java.util.concurrent.atomic.AtomicLong;
  *       to an exact Java port of the sweep using the same floats.</li>
  * </ul>
  *
- * Modes (persisted, default off): {@code record} (fixtures), {@code shadow}
- * (predict + compare, vanilla applies), {@code engine} (takeover). Any
- * engine exception disables it for the session.
+ * Modes (persisted in config/rustmi/explosion-*.properties): {@code engine} (takeover,
+ * default on), {@code shadow} (predict + compare, vanilla applies; turns the engine off),
+ * {@code seenfast} (E2, default off). Any engine exception disables it for the session.
  */
 public final class ExplosionEngine {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Rustmi-Explosion");
     private static final Path DIR = Paths.get("config", "rustmi");
-    private static final Path OUT_DIR = Paths.get("rustmi-explosion-fixtures");
 
     private static final int RAYS = 1352;
     private static final int MAX_DIM = 64;
     private static final int OUT_CAP = 32768;
-    private static final int MAX_FIXTURES = 40;
     private static final float MAX_RADIUS = 12.0f;
 
-    private static volatile boolean record = loadPersisted("explosion-record");
     private static volatile boolean shadow = loadPersisted("explosion-shadow");
     private static volatile boolean engine =
             !shadow && loadPersisted("explosion-engine", true);
@@ -112,7 +108,6 @@ public final class ExplosionEngine {
     /** Content-equal, order-differs sweeps — the expected class under Lithium
      *  (its LongOpenHashSet iteration vs vanilla HashSet iteration). */
     private static final AtomicLong SHADOW_ORDER_ONLY = new AtomicLong();
-    private static final AtomicInteger FIXTURES     = new AtomicInteger();
     private static final ConcurrentLinkedQueue<String> EXAMPLES = new ConcurrentLinkedQueue<>();
     private static volatile String lastDisqualify = "";
 
@@ -122,14 +117,8 @@ public final class ExplosionEngine {
     // Toggles
     // ─────────────────────────────────────────────────────────────────────
 
-    public static boolean isRecord() { return record; }
     public static boolean isShadow() { return shadow; }
     public static boolean isEngine() { return engine; }
-
-    public static synchronized void setRecord(boolean on) {
-        record = on;
-        persist("explosion-record", on);
-    }
 
     public static synchronized void setShadow(boolean on) {
         if (on) {
@@ -163,14 +152,13 @@ public final class ExplosionEngine {
 
     public static String status() {
         StringBuilder sb = new StringBuilder(String.format(
-                "record=%s shadow=%s engine=%s seenFast=%s | explosions=%d takeovers=%d javaFallback=%d disqualified=%d%s | " +
-                "sweepShadow ok=%d orderOnly=%d bad=%d | seen fast=%d vanilla=%d shadowBad=%d | fixtures=%d/%d",
-                record, shadow, engine, seenFast,
+                "shadow=%s engine=%s seenFast=%s | explosions=%d takeovers=%d javaFallback=%d disqualified=%d%s | " +
+                "sweepShadow ok=%d orderOnly=%d bad=%d | seen fast=%d vanilla=%d shadowBad=%d",
+                shadow, engine, seenFast,
                 EXPLOSIONS.get(), TAKEOVERS.get(), JAVA_FALLBACKS.get(), DISQUALIFIED.get(),
                 lastDisqualify.isEmpty() ? "" : " (last: " + lastDisqualify + ")",
                 SHADOW_OK.get(), SHADOW_ORDER_ONLY.get(), SHADOW_BAD.get(),
-                SEEN_FAST.get(), SEEN_VANILLA.get(), SEEN_SHADOW_BAD.get(),
-                FIXTURES.get(), MAX_FIXTURES));
+                SEEN_FAST.get(), SEEN_VANILLA.get(), SEEN_SHADOW_BAD.get()));
         if (!EXAMPLES.isEmpty()) {
             sb.append(" | ").append(String.join("; ", EXAMPLES));
         }
@@ -696,10 +684,7 @@ public final class ExplosionEngine {
             Bufs b = BUFS.get();
             var u = RustmiCramming.theUnsafe();
             drawFloats(c, u, b.floatsAddr, null);
-            // record mode wants the pure-vanilla interleaved discovery for the
-            // fixture — suppress the kernel split and filter Java-side instead.
-            boolean wantFixture = record && FIXTURES.get() < MAX_FIXTURES;
-            int kernelSkip = !wantFixture && c.skipAir != 0 ? 1 : 0;
+            int kernelSkip = c.skipAir != 0 ? 1 : 0;
             int count = runKernel(c, b, kernelSkip);
             TAKEOVERS.incrementAndGet();
             if (count >= 0 && kernelSkip == 1) {
@@ -720,9 +705,6 @@ public final class ExplosionEngine {
                 }
                 discovery = javaSweep(c, b, floats);
             }
-            if (wantFixture) {
-                dumpFixture(c, b, discovery);   // fixtures keep the pure-vanilla list
-            }
             return rebuildVanillaList(applySkipAir(c, b, discovery, true));
         } catch (Throwable t) {
             engine = false;
@@ -733,7 +715,7 @@ public final class ExplosionEngine {
 
     /** Shadow path step 1: arm the float capture before vanilla runs. */
     public static boolean armCapture() {
-        if (!shadow && !record) {
+        if (!shadow) {
             return false;
         }
         Ctx c = CTX.get();
@@ -754,7 +736,6 @@ public final class ExplosionEngine {
             return true;
         } catch (Throwable t) {
             shadow = false;
-            record = false;
             LOGGER.error("[explosion-shadow] arm failed — shadow disabled", t);
             return false;
         }
@@ -803,9 +784,6 @@ public final class ExplosionEngine {
                 SHADOW_BAD.incrementAndGet();
                 example("sweep size " + predicted.size() + " vs " + vanilla.size()
                         + " skip=" + c.skipAir + firstDiff(predicted, vanilla));
-            }
-            if (record) {
-                dumpFixture(c, b, null);
             }
         } catch (Throwable t) {
             shadow = false;
@@ -1191,56 +1169,8 @@ public final class ExplosionEngine {
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // Fixtures + persistence
+    // Persistence
     // ─────────────────────────────────────────────────────────────────────
-
-    private static void dumpFixture(Ctx c, Bufs b, List<BlockPos> discovery) {
-        int n = FIXTURES.get();
-        if (n >= MAX_FIXTURES || !FIXTURES.compareAndSet(n, n + 1)) {
-            return;
-        }
-        try {
-            var u = RustmiCramming.theUnsafe();
-            StringBuilder sb = new StringBuilder(1 << 20);
-            sb.append("{\"center\":[").append(c.center.x).append(',').append(c.center.y).append(',').append(c.center.z)
-              .append("],\"power\":").append(c.radius)
-              .append(",\"minY\":").append(c.level.getMinY())
-              .append(",\"maxYExcl\":").append(c.level.getMaxY() + 1)
-              .append(",\"origin\":[").append(c.ox).append(',').append(c.oy).append(',').append(c.oz)
-              .append("],\"dims\":[").append(c.dx).append(',').append(c.dy).append(',').append(c.dz)
-              .append("],\"floats\":[");
-            for (int i = 0; i < RAYS; i++) {
-                if (i > 0) sb.append(',');
-                sb.append(u.getFloat(b.floatsAddr + (long) i * 4));
-            }
-            sb.append("],\"resistance\":[");
-            int ri = 0;
-            for (int y = 0; y < c.dy; y++) {
-                for (int z = 0; z < c.dz; z++) {
-                    for (int x = 0; x < c.dx; x++, ri++) {
-                        if (ri > 0) sb.append(',');
-                        sb.append(resAtPacked(c, b, c.ox + x, c.oy + y, c.oz + z));
-                    }
-                }
-            }
-            sb.append(']');
-            if (discovery != null) {
-                sb.append(",\"discovery\":[");
-                for (int i = 0; i < discovery.size(); i++) {
-                    BlockPos p = discovery.get(i);
-                    if (i > 0) sb.append(',');
-                    sb.append('[').append(p.getX()).append(',').append(p.getY()).append(',').append(p.getZ()).append(']');
-                }
-                sb.append(']');
-            }
-            sb.append('}');
-            Files.createDirectories(OUT_DIR);
-            Files.write(OUT_DIR.resolve("explosion-" + (n + 1) + ".json"),
-                    sb.toString().getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            LOGGER.warn("fixture dump failed", e);
-        }
-    }
 
     private static boolean loadPersisted(String name) {
         return loadPersisted(name, false);

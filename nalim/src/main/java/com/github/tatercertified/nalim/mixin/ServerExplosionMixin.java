@@ -18,9 +18,9 @@ import org.spongepowered.asm.mixin.Shadow;
 import java.util.List;
 
 /**
- * E-campaign taps on ServerExplosion (docs/EXPLOSION_PLAN.md). All three
- * modes are runtime-toggled and default OFF — with everything off each wrap
- * is a single volatile read and the vanilla original runs untouched.
+ * ServerExplosion taps for {@link ExplosionEngine}: the sweep takeover (engine mode), the
+ * float capture and compare (shadow mode) and the E2 seen-percent path. With engine and
+ * shadow off each wrap is a single volatile read and the vanilla original runs untouched.
  */
 @Mixin(ServerExplosion.class)
 public abstract class ServerExplosionMixin {
@@ -35,7 +35,7 @@ public abstract class ServerExplosionMixin {
      *  getSeenPercent of the same explosion, cleared on exit. */
     @WrapMethod(method = "explode")
     private int rustmi$explosionContext(Operation<Integer> original) {
-        if (!ExplosionEngine.isEngine() && !ExplosionEngine.isShadow() && !ExplosionEngine.isRecord()) {
+        if (!ExplosionEngine.isEngine() && !ExplosionEngine.isShadow()) {
             return original.call();
         }
         ExplosionEngine.enterExplosion(this.level, this.center, this.radius, this.damageCalculator, this.source, this);
@@ -60,7 +60,7 @@ public abstract class ServerExplosionMixin {
         return vanilla;
     }
 
-    /** Captures the per-ray nextFloat draws while vanilla runs (shadow/record). */
+    /** Captures the per-ray nextFloat draws while vanilla runs (shadow mode). */
     @WrapOperation(method = "calculateExplodedPositions",
             at = @org.spongepowered.asm.mixin.injection.At(value = "INVOKE",
                     target = "Lnet/minecraft/util/RandomSource;nextFloat()F"))

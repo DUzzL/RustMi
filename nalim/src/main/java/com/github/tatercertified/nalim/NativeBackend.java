@@ -1,6 +1,5 @@
 package com.github.tatercertified.nalim;
 
-import com.github.tatercertified.nalim.chunk.ChunkSectionPacketEncoder;
 import com.github.tatercertified.nalim.cramming.RustmiCramming;
 import com.github.tatercertified.nalim.rust.FfmBindings;
 import com.github.tatercertified.nalim.rust.NalimBindings;
@@ -146,8 +145,7 @@ public final class NativeBackend {
         Class.forName("com.github.tatercertified.nalim.rust.NalimBindings", true, loader);
         checkLayout("Nalim",
                 NalimBindings.oxi_cramming_input_size(),
-                NalimBindings.oxi_cramming_output_size(),
-                NalimBindings.oxi_chunk_section_record_size());
+                NalimBindings.oxi_cramming_output_size());
     }
 
     private static void useFfm(String reason) {
@@ -156,8 +154,7 @@ public final class NativeBackend {
                     NativeBackend.class.getClassLoader());
             checkLayout("FFM",
                     FfmBindings.oxi_cramming_input_size(),
-                    FfmBindings.oxi_cramming_output_size(),
-                    FfmBindings.oxi_chunk_section_record_size());
+                    FfmBindings.oxi_cramming_output_size());
         } catch (Throwable t) {
             // FfmBindings' initializer binds the library; its failures arrive wrapped.
             Throwable cause = t instanceof ExceptionInInitializerError && t.getCause() != null ? t.getCause() : t;
@@ -175,13 +172,11 @@ public final class NativeBackend {
      * Confirms the loaded library is this build's (record sizes) and that return values come
      * back intact. Argument passing is covered by the in-game shadow modes and parity tests.
      */
-    private static void checkLayout(String backend, int input, int output, int section) {
-        if (input != RustmiCramming.INPUT_STRIDE || output != RustmiCramming.OUTPUT_STRIDE
-                || section != ChunkSectionPacketEncoder.SECTION_STRIDE) {
-            throw new IllegalStateException(backend + " ABI check failed: record sizes "
-                    + input + "/" + output + "/" + section + ", expected "
-                    + RustmiCramming.INPUT_STRIDE + "/" + RustmiCramming.OUTPUT_STRIDE + "/"
-                    + ChunkSectionPacketEncoder.SECTION_STRIDE);
+    private static void checkLayout(String backend, int input, int output) {
+        if (input != RustmiCramming.INPUT_STRIDE || output != RustmiCramming.OUTPUT_STRIDE) {
+            throw new IllegalStateException(backend + " ABI check failed: cramming record sizes "
+                    + input + "/" + output + ", expected "
+                    + RustmiCramming.INPUT_STRIDE + "/" + RustmiCramming.OUTPUT_STRIDE);
         }
     }
 

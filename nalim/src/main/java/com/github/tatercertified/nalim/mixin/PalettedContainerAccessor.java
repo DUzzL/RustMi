@@ -16,8 +16,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
  * ({@code InvalidAccessorException: No candidates were found matching
  * data:Ljava/lang/Object;}). {@code data} is read through a cached
  * {@code sun.misc.Unsafe} field offset instead
- * ({@link com.github.tatercertified.nalim.sections.NativeSections#dataOf}, shared by
- * the chunk encoder and {@code PalettedContainerMixin}); the returned {@code Data}
+ * ({@link com.github.tatercertified.nalim.sections.NativeSections#dataOf}, used by
+ * {@code PalettedContainerMixin}); the returned {@code Data}
  * instance is cast to {@link PalettedContainerDataAccessor} to read
  * {@code storage}/{@code palette}.
  *

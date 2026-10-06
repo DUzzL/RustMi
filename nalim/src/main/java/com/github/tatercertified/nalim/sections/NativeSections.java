@@ -135,23 +135,6 @@ public final class NativeSections {
         }
     }
 
-    public static String status() {
-        sun.misc.Unsafe u = RustmiCramming.theUnsafe();
-        long scratch = u.allocateMemory(16);
-        try {
-            RustmiLib.oxi_section_stats(scratch);
-            long bytes = u.getLong(scratch);
-            long blocks = u.getLong(scratch + 8);
-            return "nativeSections " + (enabled ? "ON" : "OFF")
-                    + (libState < 0 ? " (lib FAILED)" : "")
-                    + " live=" + (bytes >> 20) + "MiB blocks=" + blocks;
-        } catch (Throwable t) {
-            return "nativeSections " + (enabled ? "ON" : "OFF") + " (stats unavailable)";
-        } finally {
-            u.freeMemory(scratch);
-        }
-    }
-
     /** Compact one-line summary for {@code /rustmi stats}. Returns the
      *  live memory + block count without the ON/OFF prefix (the stats
      *  command renders the toggle separately). Empty string if the

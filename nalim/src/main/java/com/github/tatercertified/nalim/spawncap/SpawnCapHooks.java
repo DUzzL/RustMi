@@ -28,10 +28,6 @@ public final class SpawnCapHooks {
         }
     }
 
-    public static boolean registered() {
-        return registered;
-    }
-
     // Toggle surface for /rustmi spawncap. The `registered &&` short-circuit means
     // RustLocalCapProvider (which references Fabrolia's LocalCapBridge) is never loaded when
     // Fabrolia is absent — safe to call from RustmiCommands unconditionally.

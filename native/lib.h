@@ -3,16 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define SECTION_STRIDE 64
-
-#define MODE_SINGLE 0
-
-#define MODE_LINEAR 1
-
-#define MODE_HASHMAP 2
-
-#define MODE_GLOBAL 3
-
 /**
  * One origin's output record: candidate count + slot indices.
  * count == OVERFLOW (-1) means "more than MAX_CANDIDATES neighbours —
@@ -34,48 +24,10 @@
 
 #define MODE_DENSE 2
 
-#define MAX_SUCCESSORS 32
-
-#define T_BLOCKED 0
-
-#define T_OPEN 1
-
-#define T_WALKABLE 2
-
-#define T_WALKABLE_DOOR 3
-
-#define T_TRAPDOOR 4
-
-#define T_POWDER_SNOW 5
-
-#define T_FENCE 7
-
-#define T_WATER 9
-
-#define T_RAIL 11
-
-#define T_UNPASSABLE_RAIL 12
-
-#define T_DOOR_OPEN 17
-
-#define T_DOOR_WOOD_CLOSED 18
-
-#define T_DOOR_IRON_CLOSED 19
-
-#define T_STICKY_HONEY 22
-
-#define T_BIG_MOBS_CLOSE_TO_DANGER 26
-
-#define TYPE_COUNT 27
-
 /**
  * Vanilla default for ChainRestrictedNeighborUpdater's depth budget.
  */
 #define VANILLA_MAX_CHAIN 1000000
-
-#define TickScheduler_NUM_QUEUES 16
-
-#define TickPriority_COUNT 4
 
 #define N_CATEGORIES 8
 
@@ -106,29 +58,6 @@ typedef struct CrammingOutput {
   int32_t count;
   int32_t slots[MAX_CANDIDATES];
 } CrammingOutput;
-
-/**
- * Layout introspection for the Java side (runtime cross-check).
- */
-int32_t oxi_chunk_section_record_size(void);
-
-/**
- * Encode `n_sections` sections into `out_ptr`.
- *
- * Returns total bytes written (`>= 0`), or `-1` on any validation failure /
- * unsupported record / `out_cap` too small. Never writes a partial section.
- *
- * # Safety
- * `header_ptr` → 4 readable bytes `[i32 n_sections]`; `sections_ptr` →
- * `n_sections * 64` readable bytes (layout above); `palette_ids_ptr` → every
- * `(pal_off + pal_count)` referenced `i32`; `out_ptr` → `out_cap` writable
- * bytes. Java guarantees these by packing from validated descriptors.
- */
-int32_t oxi_chunk_section_encode(const uint8_t *header_ptr,
-                                 const uint8_t *sections_ptr,
-                                 const int32_t *palette_ids_ptr,
-                                 uint8_t *out_ptr,
-                                 int32_t out_cap);
 
 /**
  * Returns 0 on success, 1 when Java must use the exact fallback, or -1 on bad args.
@@ -220,20 +149,6 @@ int32_t oxi_sensor_query(uint64_t handle,
 int32_t oxi_cramming_query(uint64_t handle, int32_t slot, int32_t *out_ptr, int32_t out_cap);
 
 /**
- * Returns the destroyed-position count (triples written to `out_ptr` in
- * discovery order), or -1 (escape / bad args / cap exceeded) — the caller
- * must then run its exact Java fallback with the SAME floats.
- *
- * # Safety
- * All pointers must reference buffers of the stated sizes.
- */
-int32_t oxi_explosion_sweep(const uint8_t *header_ptr,
-                            const float *floats_ptr,
-                            const float *res_ptr,
-                            int32_t *out_ptr,
-                            int32_t out_cap);
-
-/**
  * Palette-packed variant — header layout (128 B):
  *   0..24   f64 cx, cy, cz
  *   24..28  f32 power
@@ -302,157 +217,6 @@ int32_t oxi_redstone_undo(uint64_t handle);
  * Drop the retention.
  */
 void oxi_redstone_end(uint64_t handle);
-
-/**
- * Open a new compile session under `handle`. Caller-assigned u64 — pick
- * any unique value (Java side allocates from an `AtomicLong`, matching
- * the redstone-engine convention).
- */
-int32_t oxi_redpiler_create(uint64_t handle);
-
-int32_t oxi_redpiler_destroy(uint64_t handle);
-
-int32_t oxi_redpiler_add_node(uint64_t handle, uint64_t packed);
-
-/**
- * Attach a `(pos, block_id)` pair to a previously-added node. `block_id`
- * is host-opaque (Java resolves it to a `BlockState` on flush).
- */
-int32_t oxi_redpiler_node_add_block(uint64_t handle,
-                                    int32_t node_idx,
-                                    int32_t x,
-                                    int32_t y,
-                                    int32_t z,
-                                    uint32_t block_id);
-
-/**
- * Add an edge `from → to` with weight `(side, ss)`. `side=1` = comparator
- * side-input lane, `0` = default.
- */
-int32_t oxi_redpiler_add_edge(uint64_t handle, int32_t from, int32_t to, uint8_t side, uint8_t ss);
-
-/**
- * Lower the assembled graph into the runtime backend. After this point
- * `add_*` calls return [`ERR_ALREADY_COMPILED`].
- */
-int32_t oxi_redpiler_compile(uint64_t handle);
-
-/**
- * Warm-up pass — bake the captured walk-time state into each gate's
- * pending-tick/output decisions. After [`oxi_redpiler_compile`] populates
- * the input histograms from each source's `output_strength`, the gates
- * (Repeater / Torch / Comparator / Lamp / Trapdoor / NoteBlock) still hold
- * the WALK-TIME `powered`/`output_power` snapshot; nothing has called
- * `update_node` on them yet to compare their histogram input against that
- * snapshot. The mismatch is real (e.g. a wire feeding a newly-walked
- * repeater whose POWERED=false in the world but whose input is actually 15)
- * — without warm-up the gate never wakes until some EXTERNAL set_input
- * event happens to ripple to it, which for a static circuit may be never.
- *
- * **MUST be called AFTER** any [`oxi_redpiler_schedule_tick`] replays.
- * `update_node` returns early for nodes whose `pending_tick` is set, so a
- * replayed tick correctly suppresses warm-up from double-scheduling. The
- * reverse order (warm-up first, replay second) was the garland bug
- * (2026-06-15): warm-up schedules a snapshot-driven tick on a gate that's
- * also about to receive a replayed pre-bail tick → two ticks fire, the
- * second flips the gate back, producing flicker that wasn't there in
- * vanilla. Fresh claims (no replay) call this immediately after compile
- * with the same effect they had before — no behavior change for that path.
- */
-int32_t oxi_redpiler_warmup(uint64_t handle);
-
-int32_t oxi_redpiler_schedule_tick(uint64_t handle,
-                                   int32_t node_idx,
-                                   int32_t delay,
-                                   uint8_t priority);
-
-/**
- * Drive an input node (Button / Lever / PressurePlate / Comparator
- * container-strength source). Mirrors the upstream `on_use_block` +
- * `set_pressure_plate` paths into one call.
- */
-int32_t oxi_redpiler_set_input(uint64_t handle, int32_t node_idx, uint8_t powered, uint8_t power);
-
-/**
- * Advance one gameTick — drains the current tick-slot's queue and runs
- * any cascading updates synchronously.
- */
-int32_t oxi_redpiler_tick(uint64_t handle);
-
-/**
- * Copy every node whose `changed` flag is set into `out_ptr` and clear
- * the flags. Wire format per node (5 × i32):
- *   `[idx, powered, locked, output_power, _reserved]`.
- *
- * Returns the count of records written, or [`ERR_OUT_CAP`] if `out_cap`
- * is smaller than the changed-set size (host should grow its buffer and
- * retry — no state mutated when [`ERR_OUT_CAP`]).
- */
-int32_t oxi_redpiler_drain_changes(uint64_t handle, int32_t *out_ptr, int32_t out_cap);
-
-/**
- * Drain every still-pending scheduled tick (slot + priority). Used by the
- * host on bail to re-instate ticks into Minecraft's `LevelChunkTicks` so
- * the world keeps ticking from exactly where the backend left off. Wire
- * format per record (4 × i32): `[node_idx, delay_remaining, priority, _reserved]`.
- *
- * After a successful drain the scheduler is left empty (slot pointer reset).
- * Returns the count of records written, or [`ERR_OUT_CAP`] if too small
- * (caller must grow and retry — nothing mutated on overflow).
- */
-int32_t oxi_redpiler_drain_pending_ticks(uint64_t handle, int32_t *out_ptr, int32_t out_cap);
-
-/**
- * Drain queued [`Event`]s. Wire format per event (1 × i32):
- *   * NoteBlockPlay: `[noteblock_id]`.
- * Returns the count of records written, or [`ERR_OUT_CAP`] if too small.
- */
-int32_t oxi_redpiler_drain_events(uint64_t handle, int32_t *out_ptr, int32_t out_cap);
-
-/**
- * Pre-populate a torch's history to mark it as currently burnt-out,
- * with the burn time offset {@code age_ticks} game ticks into the
- * past. The vanilla burnout window is 60 GT; passing
- * {@code age_ticks < 60} marks the torch burnt for another
- * {@code 60 - age_ticks} ticks, then it recovers naturally as the
- * history slides out of the window.
- *
- * <p>Used by the host on sync-rewalk: a torch that was burnt in the
- * previous backend loses its history when the backend is rebuilt
- * from a fresh walk. Without this restore, the torch would
- * re-toggle 8 times → re-burn → repeat sound, every time the user
- * edits an unrelated wire (user-reported 2026-06-15:
- * "ФАКЕЛ ПОСТОЯННО ОБНОВЛЯЕТЬСЯ КОГДА Я ГДЕ ТО СТАВЛЮ ПЫЛИНКУ").
- */
-int32_t oxi_redpiler_mark_torch_burnt(uint64_t handle,
-                                      int32_t node_idx,
-                                      int32_t age_ticks);
-
-/**
- * Drain the queued torch-burnout list — every torch that JUST entered
- * the burnt state since the last drain. Wire format per record
- * (1 × i32): `[node_idx]`. Host plays vanilla level event 1502
- * (smoke particle + redstone-torch-burnout sound) at each torch's
- * world position.
- */
-int32_t oxi_redpiler_drain_burnouts(uint64_t handle, int32_t *out_ptr, int32_t out_cap);
-
-/**
- * Look up a node index by world position. Returns the index or [`ERR_OUT_OF_RANGE`].
- */
-int32_t oxi_redpiler_lookup_pos(uint64_t handle, int32_t x, int32_t y, int32_t z);
-
-/**
- * Dump the `(pos, block_id)` flush table for a given node. The host calls
- * this on flush to map runtime nodes back to world block writes. Wire
- * format per block (4 × i32): `[x, y, z, block_id]`.
- *
- * Returns the count of records written, or [`ERR_OUT_CAP`] if too small.
- */
-int32_t oxi_redpiler_node_blocks(uint64_t handle,
-                                 int32_t node_idx,
-                                 int32_t *out_ptr,
-                                 int32_t out_cap);
 
 /**
  * Allocate a zeroed native u64 array of `words` elements, 64-aligned.

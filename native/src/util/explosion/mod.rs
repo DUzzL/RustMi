@@ -30,12 +30,15 @@ pub struct Bounds {
     pub max_y: i32, // exclusive
 }
 
+/// Dense f32 resistance grid: the reference oracle the packed kernel is tested against.
+#[cfg(test)]
 pub struct Snapshot<'a> {
     pub origin: (i32, i32, i32),
     pub dims: (i32, i32, i32),
     pub resistance: &'a [f32],
 }
 
+#[cfg(test)]
 impl Snapshot<'_> {
     #[inline]
     fn get(&self, x: i32, y: i32, z: i32) -> Option<f32> {
@@ -258,9 +261,10 @@ where
     }
 }
 
-/// Run the sweep over a dense snapshot. Returns true on success (positions
+/// Run the sweep over a dense snapshot (test oracle). Returns true on success (positions
 /// in `out`, discovery order, air included — pure vanilla list); false when
 /// a ray escaped the snapshot (caller must fall back).
+#[cfg(test)]
 pub fn sweep(
     center: (f64, f64, f64),
     power: f32,
