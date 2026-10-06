@@ -3,6 +3,9 @@
 
 usage: drive.py <config> <outdir>
   config: V (vanilla), R (rustmi), L (lithium+fabric-api+fabrolia), LR (L + rustmi)
+env: RUSTMI_EXTRA_JVM (extra server JVM flags, e.g. -Drustmi.backend=ffm),
+     RUSTMI_JAR (jar under test; default build/libs/rustmi-*.jar), RUSTMI_STAND (stand dir),
+     RUSTMI_EXTRA_MODS (os.pathsep-separated extra mod jars for one-off runs)
 
 Every config runs the same deterministic part on a fresh world:
   freeze ticks -> deterministic gamerules -> forceload a box far from spawn (pure
@@ -31,10 +34,10 @@ JAVA = os.path.join(os.environ["JAVA_HOME"], "bin", "java") if os.environ.get("J
 
 
 def rustmi_jar():
-    """The jar under test: $RUSTMI_JAR, else the one compileLocally built."""
+    """The jar under test: $RUSTMI_JAR, else the one `./gradlew build` produced."""
     if os.environ.get("RUSTMI_JAR"):
         return os.environ["RUSTMI_JAR"]
-    libs = os.path.join(REPO, "nalim", "build", "libs")
+    libs = os.path.join(REPO, "build", "libs")
     jars = [j for j in os.listdir(libs) if j.startswith("rustmi-") and j.endswith(".jar")
             and not j.endswith("-sources.jar")] if os.path.isdir(libs) else []
     if len(jars) != 1:
@@ -535,6 +538,9 @@ def main():
     res["log_errors"] = [l for l in s.lines if re.search(r"/(ERROR|FATAL)\]", l)
                          or "Exception" in l and "Error loading class" not in l][:50]
     res["exit_code"] = s.p.returncode
+    # NativeBackend logs its choice once; harness.sh checks it against the forced mode.
+    backend = [m.group(1) for m in (re.search(r"RustMI native backend: (\S+)", l) for l in s.lines) if m]
+    res["backend"] = backend[0] if backend else None
     with open(os.path.join(outdir, "result.json"), "w") as f:
         json.dump(res, f, indent=1)
     print(json.dumps({k: v for k, v in res.items() if k != "log_errors"}))

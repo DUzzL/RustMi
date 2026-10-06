@@ -7,8 +7,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # One job, same steps as a local `./gradlew compileLocally`: cargo-zigbuild cross-compiles
-  # the native library for all six platforms and Gradle packs them into one jar.
+  # One job, same as a local `./gradlew build`: cargo-zigbuild cross-compiles the native
+  # library for all six platforms, Gradle packs them into one jar and runs every test.
   build:
     runs-on: ubuntu-latest
     steps:
@@ -26,11 +26,6 @@ jobs:
       - name: Install cargo-zigbuild
         run: cargo install cargo-zigbuild --locked --version 0.23.4
 
-      - name: Native tests
-        run: |
-          cd native
-          cargo test --release --locked
-
       - name: Setup JDK
         uses: actions/setup-java@v5
         with:
@@ -40,14 +35,14 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x gradlew
 
-      - name: Build
-        run: ./gradlew compileLocally --no-daemon
+      - name: Build and test
+        run: ./gradlew build --no-daemon
 
       - name: Upload Rustmi
         uses: actions/upload-artifact@v6
         with:
           name: rustmi
           path: |
-            nalim/build/libs/*.jar
-            !nalim/build/libs/*-sources.jar
+            build/libs/*.jar
+            !build/libs/*-sources.jar
           compression-level: 0

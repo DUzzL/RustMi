@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Turns harness artefacts into METRIC/ASI lines.
 
+usage: summarize.py <backend>...   (reads stand/runs/{R,LR}-<backend>, e.g. nalim ffm)
+
 vanilla_failures (primary, lower is better) counts every observed deviation from vanilla
-or crash-class problem; perf/RAM numbers are secondary metrics.
+or crash-class problem, over every backend; perf/RAM numbers are secondary metrics,
+reported per run as <cfg>-<backend>_<metric>.
 """
 import json
 import os
@@ -36,10 +39,10 @@ def main():
     fails = {}
     metrics = {}
     asi = {}
-    cargo_failed = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-    fails["cargo_tests"] = cargo_failed
+    backends = sys.argv[1:] or ["nalim"]
+    runs = [(f"{cfg}-{b}", ref, b) for b in backends for cfg, ref in (("R", "ref-V"), ("LR", "ref-L"))]
 
-    for cfg, ref in (("R", "ref-V"), ("LR", "ref-L")):
+    for cfg, ref, backend in runs:
         r = load(cfg)
         if r is None:
             fails[f"{cfg}_missing"] = 100
@@ -48,6 +51,10 @@ def main():
             fails[f"{cfg}_run_error"] = 50
             asi[f"{cfg}_error"] = r["error"][:200]
         fails[f"{cfg}_log_errors"] = len(r.get("log_errors", []))
+        # The run must have used the backend it forced (-Drustmi.backend=<backend>).
+        if (r.get("backend") or "").lower() != backend:
+            fails[f"{cfg}_wrong_backend"] = 50
+            asi[f"{cfg}_backend"] = r.get("backend")
         if r.get("log_errors"):
             asi[f"{cfg}_first_log_error"] = r["log_errors"][0][:200]
         rs = regions(f"{ref}/rs", f"{cfg}/rs", 18, 19)
