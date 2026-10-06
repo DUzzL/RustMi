@@ -5,35 +5,35 @@ import com.github.tatercertified.nalim.collision.CollisionEngine;
 import com.github.tatercertified.nalim.explosion.ExplosionEngine;
 import com.github.tatercertified.nalim.sections.NativeSections;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.server.level.ServerLevel;
 
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
- * Runtime control surface for Rustmi — Fabrolia-style command structure
- * (one toggle per feature, single {@code /rustmi stats} entry for
- * the everything-at-a-glance view).
+ * The {@code /rustmi} command tree (ops only): one on/off toggle per feature, plus shadow
+ * (compare-with-vanilla) modes and status counters.
  *
  * <pre>
- * /rustmi stats                    — all feature toggles
- * /rustmi mathcheck                — live bit-exact Mth parity probe
- * /rustmi cramming on|off          — entity cramming (native Rust path)
- * /rustmi sections on|off          — native palette storage (off-heap)
- * /rustmi collision on|off         — native collision engine
- * /rustmi collision status         — live engine and shadow counters
- * /rustmi explosion on|off         — native explosion engine
- * /rustmi redstone on|off          — R3 cascade takeover
+ * /rustmi stats                           — native backend, every toggle, section memory
+ * /rustmi cramming on|off|status          — batched entity pushing (Rust kernel)
+ * /rustmi cramming shadow on|off          — re-run vanilla and count set/order mismatches
+ * /rustmi collision on|off|status         — mirror-backed block collision
+ * /rustmi collisionshadow on|off          — compare every collision with vanilla
+ * /rustmi explosion on|off|status         — native explosion block sweep
+ * /rustmi explosion shadow|seenfast on|off
+ * /rustmi sections on|off|wirecheck       — off-heap block-state storage
+ * /rustmi redstone on|off|status          — redstone-wire cascade takeover (R3)
+ * /rustmi spawncap on|off                 — native local mob-cap (with Fabrolia)
  * </pre>
+ *
+ * tools/parity/drive.py parses the status lines with regexes: change their wording
+ * together with the harness.
  */
 public final class RustmiCommands {
 
@@ -45,7 +45,6 @@ public final class RustmiCommands {
         dispatcher.register(Commands.literal("rustmi")
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(statsCommand())
-                .then(mathCheckCommand())
                 .then(toggleCommand("cramming",
                         CrammingHooks::isCrammingEnabled, CrammingHooks::setCrammingEnabled)
                         .then(Commands.literal("status").executes(ctx -> sendLine(ctx,
@@ -102,18 +101,6 @@ public final class RustmiCommands {
 
             ctx.getSource().sendSuccess(() -> msg, false);
             return 1;
-        });
-    }
-
-    /** {@code /rustmi mathcheck} — exercise the live, transformed Mth implementation. */
-    private static LiteralArgumentBuilder<CommandSourceStack> mathCheckCommand() {
-        return Commands.literal("mathcheck").executes(ctx -> {
-            String result = MathCheck.run();
-            boolean ok = result.startsWith("ВСЁ СОВПАЛО");
-            ctx.getSource().sendSuccess(() -> ((MutableComponent) PREFIX.copy())
-                    .append(Component.literal(result)
-                            .withStyle(ok ? ChatFormatting.GREEN : ChatFormatting.RED)), false);
-            return ok ? 1 : 0;
         });
     }
 

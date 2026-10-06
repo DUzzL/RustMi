@@ -264,11 +264,6 @@ int32_t oxi_explosion_sweep_packed(uint8_t *header_ptr,
                                    int32_t *out_ptr);
 
 /**
- * Compresses an RGB value into a single int
- */
-uint32_t pack_rgb(float red, float green, float blue);
-
-/**
  * Build the network from the marshalled snapshot and retain it.
  *
  * # Safety

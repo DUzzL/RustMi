@@ -61,7 +61,6 @@ def main():
         else:
             fails[f"{cfg}_worldgen_real_cells"] = tg["real_cells"] + tg["biome_cells"]
             metrics[f"{cfg}_worldgen_noise_cells"] = tg["noise_cells"]
-        fails[f"{cfg}_mathcheck"] = r.get("mathcheck_mismatch", 0)
         cs = r.get("collision_shadow", {})
         fails[f"{cfg}_collision_bad"] = cs.get("bad", 0)
         es = r.get("explosion_shadow", {})

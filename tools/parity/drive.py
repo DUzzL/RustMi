@@ -361,8 +361,6 @@ def collider_window_scenarios(s, x, y, z):
 def rustmi_scenario(s, res):
     """Shadow counters + perf/RAM workload (rustmi configs only)."""
     s.cmd("tick unfreeze")
-    m = s.ask("rustmi mathcheck", r"Rustmi.*(СОВПАЛО|РАСХОЖДЕНИЙ: (\d+))", 120)
-    res["mathcheck_mismatch"] = int(m.group(2)) if m.group(2) else 0
     s.cmd("rustmi explosion shadow on")
     s.cmd("rustmi collisionshadow on")
     s.cmd("rustmi cramming shadow on")

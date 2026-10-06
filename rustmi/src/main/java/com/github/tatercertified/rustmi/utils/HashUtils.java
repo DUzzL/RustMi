@@ -1,6 +1,5 @@
 package com.github.tatercertified.rustmi.utils;
 
-import com.github.tatercertified.rustmi.Config;
 import com.github.tatercertified.rustmi.Rustmi;
 
 import java.io.*;
@@ -16,11 +15,7 @@ public final class HashUtils {
         String correctHash = getLibHash(currentOSLibName);
         String presentHash = getFileHash(libRustmi);
         if (!correctHash.equals(presentHash)) {
-            // Null-safe: this runs from mixin-plugin onLoad where Config may
-            // not be initialised yet; a debug-gated log must never throw.
-            if (Config.getInstance() != null && Config.getInstance().debug()) {
-                Rustmi.LOGGER.info("Outdated Rustmi Binary Found. Updating...");
-            }
+            Rustmi.LOGGER.info("Native library {} is missing or outdated; extracting it", libPath);
             return false;
         }
         return true;

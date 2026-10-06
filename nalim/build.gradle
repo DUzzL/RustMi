@@ -291,14 +291,6 @@ tasks.register('regionalCrammingGeometryTest', JavaExec) {
     mainClass.set('com.github.tatercertified.nalim.cramming.RegionalCrammingGeometryTest')
 }
 
-tasks.register('mthInlineSemanticsTest', JavaExec) {
-    group = 'verification'
-    description = 'Checks direct Mth helper edge and exception semantics.'
-    dependsOn tasks.named('testClasses')
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass.set('com.github.tatercertified.nalim.MthInlineSemanticsTest')
-}
-
 tasks.register('collisionCompatibilityTest', JavaExec) {
     group = 'verification'
     description = 'Checks collision fallback precision and mover-predicate gates.'
@@ -324,7 +316,6 @@ tasks.named('test') {
 tasks.named('check') {
     dependsOn tasks.named('activeRegionBatchesTest')
     dependsOn tasks.named('regionalCrammingGeometryTest')
-    dependsOn tasks.named('mthInlineSemanticsTest')
     dependsOn tasks.named('collisionCompatibilityTest')
     dependsOn tasks.named('explosionSeenClipTest')
     dependsOn tasks.named('nativeBindingsContractTest')

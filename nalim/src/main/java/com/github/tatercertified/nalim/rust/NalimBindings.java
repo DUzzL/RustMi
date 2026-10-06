@@ -27,12 +27,6 @@ public final class NalimBindings {
         }
         Linker.linkClass(NalimBindings.class);
     }
-
-
-    @Critical
-    @Link
-    public static native int pack_rgb(float r, float g, float b);
-
     // ====================================================================
     // Ferrite-style batched cramming kernel.
     //

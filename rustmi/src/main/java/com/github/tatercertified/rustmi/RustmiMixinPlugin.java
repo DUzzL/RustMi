@@ -1,6 +1,5 @@
 package com.github.tatercertified.rustmi;
 
-import com.github.tatercertified.rustmi.utils.asm.StripProcessor;
 import com.moulberry.mixinconstraints.MixinConstraints;
 import com.moulberry.mixinconstraints.mixin.MixinConstraintsBootstrap;
 import org.objectweb.asm.tree.ClassNode;
@@ -15,10 +14,8 @@ public class RustmiMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String s) {
-        // Config must exist before hash validation; native extraction must
-        // finish before a backend eagerly links its binding class.
+        // Native extraction must finish before a backend eagerly links its binding class.
         try {
-            Config.init();
             LoadRustBinary.onPreLaunch();
             Rustmi.BACKEND.onStartup();
         } catch (RuntimeException e) {
@@ -40,7 +37,7 @@ public class RustmiMixinPlugin implements IMixinConfigPlugin {
         if (this.mixinPackage != null && !mixinClassName.startsWith(this.mixinPackage)) {
             return true;
         }
-        return MixinConstraints.shouldApplyMixin(mixinClassName); // && MCMixinConfigPlugin.processMixinConfig(mixinClassName);
+        return MixinConstraints.shouldApplyMixin(mixinClassName);
     }
 
     @Override
@@ -49,12 +46,11 @@ public class RustmiMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public List<String> getMixins() {
-        return Config.getInstance().test() ? List.of() : null;
+        return null;
     }
 
     @Override
     public void preApply(String targetClassName, ClassNode classNode, String mixinClassName, IMixinInfo iMixinInfo) {
-        StripProcessor.processStrips(targetClassName, classNode);
     }
 
     @Override
