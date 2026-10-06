@@ -164,7 +164,7 @@ public final class NativeSections {
         // PalettedContainer.pack with a path that casts BitStorage to its
         // own CompactingPackedIntegerArray interface — NativeBitStorage
         // doesn't implement that interface so the cast throws on every
-        // chunk save. Mitigation: rustmi-base's fabric.mod.json declares
+        // chunk save. Mitigation: src/main/resources/fabric.mod.json declares
         // `lithium:options.chunk.serialization=false` so the offending
         // Lithium mixin never applies and vanilla pack() (which doesn't
         // cast) runs instead. Don't drop that option or chunks stop saving.

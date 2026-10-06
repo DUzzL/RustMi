@@ -16,7 +16,7 @@ JARS=(
   "fabric-api-0.161.0+26.3.jar|https://cdn.modrinth.com/data/P7dR8mSH/versions/bNnaTiuM/fabric-api-0.161.0%2B26.3.jar|ed6b2586d6fde11fde8472f5a527c51e99b67026e46f94d4bfd85e7e28ce5ee299173ee16ad576ceb51f39f98d30a811086a6deb1a86a524859cc16e12da109d"
 )
 # Fabrolia comes from the sibling project's release folder unless FABROLIA_JAR is set.
-FABROLIA_JAR=${FABROLIA_JAR:-$(ls "$REPO"/../Fabrolia/release/fabrolia-fabric-*.jar 2>/dev/null | head -1)}
+FABROLIA_JAR=${FABROLIA_JAR:-$(ls "$REPO"/../Fabrolia/release/fabrolia-fabric-*.jar 2>/dev/null | sort -V | tail -1)}
 
 mkdir -p "$STAND/server/config" "$STAND/jars" "$STAND/runs" "$STAND/logs"
 

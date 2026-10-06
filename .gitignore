@@ -7,6 +7,10 @@ build/
 *.dylib
 *.hash
 
+# Server output of test mains / Loom run configs
+/logs/
+/run/
+
 # Local data (see AGENTS.md): parity stand and release jars
 /stand/
 /release/

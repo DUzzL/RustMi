@@ -179,6 +179,11 @@ public final class CrammingHooks {
                         "(per-region batches whenever /async regions is active).");
         } catch (ClassNotFoundException e) {
             LOGGER.info("Fabrolia RegionTickHooks not present (old Fabrolia or absent) — global batch only.");
+        } catch (LinkageError e) {
+            // Fabrolia changed an API Rustmi was compiled against (libs/fabrolia-compile.jar).
+            regionsLinked = false;
+            LOGGER.error("Fabrolia's region API differs from the one Rustmi was built against — regional "
+                    + "cramming disabled, global batch only. Rebuild Rustmi against this Fabrolia.", e);
         }
     }
 

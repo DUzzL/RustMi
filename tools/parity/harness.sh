@@ -33,10 +33,11 @@ if ! ./gradlew build --console=plain > "$STAND/logs/build.log" 2>&1; then
 fi
 
 cd "$HERE" || exit 1
-# A reference is valid for the exact server, stack jars and scenario it was recorded with.
+cp "$HERE/config/"* "$STAND/server/config/"
+# A reference is valid for the exact server, stack jars, config and scenario it was recorded with.
 ref_key() {
     {
-        sha256sum "$STAND/server/fabric-server-launch.jar" "$HERE/drive.py" | cut -d' ' -f1
+        sha256sum "$STAND/server/fabric-server-launch.jar" "$HERE/drive.py" "$HERE"/config/* | cut -d' ' -f1
         if [ "$1" = L ]; then sha256sum "$STAND"/jars/*.jar | cut -d' ' -f1; fi
     } | sha256sum | cut -d' ' -f1
 }

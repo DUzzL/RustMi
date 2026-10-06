@@ -43,8 +43,9 @@ export JAVA_HOME=/path/to/jdk-25
 
 `build` cross-compiles the library for all six targets (cached after the first run), packs
 it with SHA-256 files, and runs `check`: the Java test mains in `src/test`, `cargo test`,
-and `NativeBindingsContractTest`. zig must be 0.14.x (`$ZIG`, `~/.local/opt/zig-0.14.1/zig`
-or `PATH`); 0.15+ fails on the macOS targets.
+and `NativeBindingsContractTest`; so `test`/`check` need the toolchain too. zig comes from
+`$ZIG`, `~/.local/opt/zig-0.14.1/zig` or `PATH`; tested with 0.14.1, and 0.16 cannot link the
+macOS libraries.
 
 ## Verify at runtime
 
@@ -64,8 +65,9 @@ toggles features on a crowd workload for A/B timing.
 ## Native surface
 
 - Declare a function once in `src/main/java/.../nalim/rust/NalimBindings.java`:
-  `@Link(name = "oxi_…") public static native <type> name(<params>);` on one line, with
-  primitives only (pointers are `long` addresses; widths must match `lib.h` exactly).
+  `@Link(name = "oxi_…") public static native <type> name(<params>);` with only
+  `int`/`long`/`double`/`float`/`byte`/`short` (and `void` returns); pointers are `long`
+  addresses, widths must match `lib.h` exactly. Other shapes fail the build.
   Callers use `RustmiLib.name(...)`; the build regenerates the facade and FFM bindings.
 - `@Critical` (FFM call without a thread-state transition) only for short, bounded functions
   that never wait on a lock another call may hold long; everything else stays plain.
@@ -91,12 +93,17 @@ toggles features on a crowd workload for A/B timing.
   - Rustmi compiles against Fabrolia's `regions.{Region,RegionGrid,RegionScheduler,
     RegionTickHooks,RegionWorkerThread}`, `SensorCandidateBridge`, `LocalCapBridge` from
     `libs/fabrolia-compile.jar`, and reflects on `ParallelProcessor.executor` /
-    `pumpUntilDone` and `IslandScheduledTicks.SCHEDULED_TICK_FILTER`. A missing reflective
-    member only logs "not present" and disables that integration.
+    `pumpUntilDone`. When Fabrolia is absent or its API differs (a `LinkageError` at the
+    first tick), Rustmi logs it and uses its own non-regional paths. Ship a Rustmi built
+    against the Fabrolia that runs next to it.
 - `tools/parity/drive.py` parses `/rustmi … status` lines with regexes; change their wording
   together with the harness.
 - Main code compiles with `--release 17` to match the mixins' `compatibilityLevel`; only the
-  generated FFM source set uses 25. The mod still requires Java 25.
+  generated FFM source set uses 25. The mod still requires Java 25 (Gradle toolchain = 25).
+- `RustmiMixinPlugin.onLoad` runs before Minecraft classes are transformed. Code reachable
+  from it (`LoadRustBinary`, `NativeBackend`, `CrammingHooks.register`,
+  `SpawnCapHooks.register`) must not make the JVM load a `net.minecraft` class, or Mixin
+  fails with "target was loaded too early"; keep MC-typed work behind the first tick.
 - `fabric.mod.json` `lithium:options` are parity settings (`math.sine_lut`) and a native
   sections requirement (`chunk.serialization`); `DebugifyMixinCanceller` keeps vanilla sin/cos.
 - macOS builds use the system allocator (mimalloc needs SDK headers zig lacks).
@@ -112,7 +119,8 @@ toggles features on a crowd workload for A/B timing.
 
 ## Release and install
 
-1. `./gradlew build` and `tools/parity/harness.sh` with `vanilla_failures=0`.
+1. `./gradlew clean build` (one jar in `build/libs`, which the harness needs) and
+   `tools/parity/harness.sh` with `vanilla_failures=0`.
 2. Copy `build/libs/rustmi-<version>.jar` to `release/`, `sha256sum *.jar > SHA256SUMS`
    there, and move the tag: `git tag -fa prod/current -m "<version>"`.
 3. Install with the server stopped: replace `mods/rustmi-*.jar` (and remove any old
@@ -121,8 +129,9 @@ toggles features on a crowd workload for A/B timing.
 
 ## Git
 
-Branch `main`; tag `prod/current` = the commit of the jar in `release/`. `origin` is the
-upstream project (Tater-Certified/Oxidizium); this fork is not pushed there.
+Branch `main`; tag `prod/current` = the commit of the jar in `release/`. The only remote,
+`upstream`, is the original project (Tater-Certified/Oxidizium) with pushing disabled; this
+fork has never been pushed there.
 
 ## Known open items
 

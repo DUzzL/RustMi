@@ -10,7 +10,8 @@ Nalim library (`one.nalim`, `../nalim`).
 
 1. Mixin selects `rustmi.mixins.json` and calls `R/RustmiMixinPlugin.onLoad` — before any
    class is transformed. It runs, in order:
-   - `R/LoadRustBinary.onPreLaunch`: picks `librustmi_<os>_<arch>` from the jar, extracts it
+   - `R/LoadRustBinary.onPreLaunch`: picks this platform's library from the jar
+     (`librustmi_linux_x86.so`, `rustmi_windows_arm64.dll`, …), extracts it
      to `libraries/rustmi/` when missing or its SHA-256 differs from the bundled `.hash`,
      rejects musl JVMs, sets `-Drustmi.native.path`;
    - `N/NativeBackend.select`: Nalim or FFM (rules in AGENTS.md), then a layout probe
@@ -27,12 +28,14 @@ Nalim library (`one.nalim`, `../nalim`).
 ## Features
 
 Every feature is on by default and toggled with `/rustmi <feature> on|off`
-(`N/redstone/RustmiCommands`, persisted under `config/rustmi/` or `config/rustmi-runtime/`).
+(`N/redstone/RustmiCommands`); toggles persist under `config/rustmi/` or
+`config/rustmi-runtime/`, except `spawncap`, which is back on after a restart.
 Each has a vanilla fallback per call: when a precondition is not proven, vanilla runs.
 
 ### Collision (block collision of `Entity.move`)
 - Entry: `N/mixin/EntityCollideMixin` (`Entity.collide`), `EntitySupportingBlockMixin`
-  (`findSupportingBlock`), `EntityColliderQueryMixin`.
+  (`findSupportingBlock`), `EntityColliderQueryMixin` (only without Lithium:
+  `@IfModAbsent("lithium")`).
 - Java: `N/collision/CollisionEngine` (`tryCollide`, classifier, shadow),
   `CubeMirror` (per-section class bitsets, built by `N/mixin/LevelChunkMirrorMixin`,
   invalidated there and by `BulkSectionAccessMirrorMixin`), `SupportingBlock`,

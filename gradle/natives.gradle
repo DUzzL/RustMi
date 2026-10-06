@@ -1,7 +1,7 @@
 // Applied from build.gradle. Cross-compiles the Rust library (native/) for every supported
 // platform with cargo-zigbuild and packs all six into the jar; LoadRustBinary extracts the
-// one matching the running JVM. Needs the rustup targets below and zig 0.14.x
-// (tools/setup-toolchain.sh installs both; zig 0.15+ cannot link the macOS libraries).
+// one matching the running JVM. Needs the rustup targets below and zig 0.14.1
+// (tools/setup-toolchain.sh installs both; zig 0.16 cannot link the macOS libraries).
 // zig is taken from $ZIG, else ~/.local/opt/zig-0.14.1/zig, else PATH.
 
 import java.security.MessageDigest
@@ -21,12 +21,16 @@ def zigBinary = System.getenv('ZIG') ?: new File(System.getProperty('user.home')
     it.canExecute() ? it.absolutePath : null
 }
 def nativeSources = [file('native/src'), file('native/Cargo.toml'), file('native/Cargo.lock'), file('native/build.rs')]
+// A toolchain change must rebuild the libraries too, not only a source change.
+def rustcVersion = providers.exec { commandLine 'rustc', '-V'; ignoreExitValue = true }.standardOutput.asText
 
 def cargoTasks = nativeTargets.collect { packaged, spec ->
     tasks.register("cargo_${spec.dir.replace('-', '_')}", Exec) {
         group = 'native'
         description = "Builds native/ for ${spec.target}."
         inputs.files(nativeSources)
+        inputs.property('rustc', rustcVersion)
+        inputs.property('zig', zigBinary ?: 'PATH')
         outputs.file("native/target/${spec.dir}/release/${spec.file}")
         workingDir 'native'
         if (zigBinary != null) {
@@ -67,4 +71,8 @@ def packageNatives = tasks.register('packageNatives') {
     }
 }
 
-sourceSets.main.resources.srcDir(files(packagedNativesDir).builtBy(packageNatives))
+// Into the jar (and the test runtime classpath) through processResources only, so the
+// sources jar stays free of binaries.
+tasks.named('processResources') {
+    from(packageNatives)
+}

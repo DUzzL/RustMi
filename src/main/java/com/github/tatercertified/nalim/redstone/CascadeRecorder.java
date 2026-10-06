@@ -129,10 +129,7 @@ public final class CascadeRecorder {
     /** Optimizations default ON for fresh installs (user directive 2026-06-12);
      *  the persisted file, once written by a toggle command, always wins. */
     static boolean loadPersistedState(Path file, boolean def) {
-        if (!java.nio.file.Files.exists(file)) {
-            return def;
-        }
-        return loadPersisted(file);
+        return loadPersisted(file, def);
     }
 
     /** Shared with {@link CascadeEngine}. */
@@ -156,6 +153,10 @@ public final class CascadeRecorder {
     }
 
     private static boolean loadPersisted(Path file) {
+        return loadPersisted(file, false);
+    }
+
+    private static boolean loadPersisted(Path file, boolean def) {
         try {
             if (Files.exists(file)) {
                 for (String line : Files.readAllLines(file)) {
@@ -167,7 +168,7 @@ public final class CascadeRecorder {
             }
         } catch (IOException ignored) {
         }
-        return false;
+        return def;
     }
 
     private static void persist(Path file, String title, boolean on) {

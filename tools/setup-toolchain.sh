@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Installs what `./gradlew compileLocally` needs besides a JDK 25 and rustup:
-# the five extra Rust targets, cargo-zigbuild, and zig 0.14.1 in ~/.local/opt/zig-0.14.1
-# (where build.gradle looks when ZIG is unset). zig 0.15+ cannot build the macOS libraries.
+# Installs what `./gradlew build` needs besides a JDK 25 and rustup (Linux host): the five
+# extra Rust targets, cargo-zigbuild 0.23.4, and zig 0.14.1 in ~/.local/opt/zig-0.14.1
+# (where gradle/natives.gradle looks when ZIG is unset). Tested with zig 0.14.1; 0.16
+# cannot link the macOS libraries.
 set -euo pipefail
 
 rustup target add aarch64-unknown-linux-gnu x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm \

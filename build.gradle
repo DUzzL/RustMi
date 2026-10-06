@@ -83,6 +83,8 @@ processResources {
 }
 
 java {
+    // Gradle on another JDK uses an installed JDK 25 (or fails with a clear message).
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
     withSourcesJar()
 }
 
@@ -106,6 +108,9 @@ def mainTest = { String taskName, String testClass, String what, List<String> ma
         classpath = sourceSets.test.runtimeClasspath
         mainClass.set(testClass)
         args mainArgs
+        // Minecraft classes write logs/latest.log into the working directory.
+        workingDir = layout.buildDirectory.dir('test-run').get().asFile
+        doFirst { workingDir.mkdirs() }
     }
     tasks.named('check') { dependsOn taskName }
 }

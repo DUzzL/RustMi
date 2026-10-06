@@ -2,8 +2,9 @@
 
 Server-side Fabric optimizations for Minecraft 26.3 with the hot paths in Rust and vanilla
 results kept bit for bit: block collision, entity cramming and sensors, explosions,
-redstone wire cascades, off-heap block storage, and (with Fabrolia) spawn caps. One jar runs
-on Linux, Windows and macOS, x86_64 and arm64.
+redstone wire cascades, off-heap block storage, and (with Fabrolia) spawn caps. One jar ships
+the native library for Linux, Windows and macOS on x86_64 and arm64; only Linux x86_64 has
+been run live so far.
 
 - **Working on the code (people and AI agents): read [`AGENTS.md`](AGENTS.md) first.**
 - Code map and each feature's vanilla rules: [`docs/CODEMAP.md`](docs/CODEMAP.md).
@@ -11,9 +12,10 @@ on Linux, Windows and macOS, x86_64 and arm64.
 
 ## Requirements
 
-- Minecraft 26.3, Fabric Loader 0.19.5+, Java 25. Fabric API is not required.
+- Minecraft 26.3, Fabric Loader (built against 0.19.5), Java 25. Fabric API is not required.
 - Linux builds need glibc 2.17+ (not musl/Alpine).
-- Tested with Lithium 0.26.2, Fabrolia, C2ME 0.4.2. It refuses to start next to the old
+- Runs in production with Lithium 0.26.2, Fabrolia 0.2.38, C2ME 0.4.2; the parity harness
+  covers Lithium + Fabric API + Fabrolia. It refuses to start next to the old
   `rustmi-nalim` / `rustmi-panama` / `rustmi-membrane` jars.
 
 ## Install
