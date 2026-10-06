@@ -17,8 +17,7 @@ import java.util.concurrent.ExecutorService;
 
 /**
  * Wires the cramming pre-phase into the server tick — driven by
- * {@code MinecraftServerTickMixin}, not Fabric API (no fabric-api dep
- * on the nalim subproject).
+ * {@code MinecraftServerTickMixin}, not Fabric API (Rustmi does not depend on it).
  *
  * <p>Fabrolia compatibility:
  * <ul>
@@ -345,8 +344,6 @@ public final class CrammingHooks {
     }
 
     private static void collectFromLevel(ServerLevel level, RustmiCramming c) {
-        // In MC 26.1.x mojmap, ResourceLocation became Identifier and the
-        // ResourceKey accessor is .identifier(), not .location().
         int dimId = level.dimension().identifier().hashCode();
 
         OrderedScratch ordered = entitiesInSectionOrder(level);

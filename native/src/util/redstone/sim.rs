@@ -2,7 +2,7 @@
 //! bit-exactly from a network snapshot, without touching the world.
 //!
 //! Composition of the three pillars:
-//!   * power math   — `DefaultRedstoneController` (26.1.2 source, ported
+//!   * power math   — `DefaultRedstoneWireEvaluator` (26.1.2 source, ported
 //!     below): target = sp==15 ? 15 : max(sp, max(neighbour wire power)−1).
 //!     Direction order is irrelevant here (pure max).
 //!   * update order — [`jorder::evaluator_update_order`]: the evaluator's
@@ -74,7 +74,7 @@ struct WireSim<'a> {
     events: &'a mut Vec<Ev>,
 }
 
-/// DefaultRedstoneController.update power step, shared by both entry modes:
+/// DefaultRedstoneWireEvaluator power step (yarn: DefaultRedstoneController.update), shared by both entry modes:
 /// EVAL (+SET when power changes). Returns the evaluator's 7-position
 /// update list (jorder) when a SET happened, None otherwise.
 fn do_update(net: &mut WireNetwork, events: &mut Vec<Ev>, target: Pos) -> Option<[Pos; 7]> {

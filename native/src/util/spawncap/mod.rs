@@ -16,7 +16,7 @@
 //   * near player : !spectator && euclidean²(chunkCenter, player) < 16384  (128 blocks)
 //                   chunkCenter = (cx*16+8, cz*16+8); matches getPlayersCloseForSpawning
 //                   (assumes view-distance >= 8 chunks so tracking ⊇ spawn range — the
-//                   normal case; flagged in SPAWNCAP_PLAN.md as the one approximation)
+//                   normal case; the one known approximation of vanilla)
 //   * potential   : charge * Σ_i (charge_i / sqrt(distSq_i)), distSq = blockPos.distSqr,
 //                   distSq==0 => +inf, charge==0 => 0 (PotentialCalculator.getPotentialEnergyChange);
 //                   zero charges are never recorded (addCharge)

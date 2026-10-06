@@ -1,7 +1,8 @@
-// Vanilla-exact explosion ray sweep (E1 of docs/EXPLOSION_PLAN.md).
+// Vanilla-exact explosion ray sweep (see docs/CODEMAP.md, "Explosions").
 pub mod ffi;
 //
-// Port of ServerExplosion.calculateExplodedPositions (26.1.2): 1352 rays
+// Port of ServerExplosion.calculateExplodedPositions (26.1.2 source; checked against
+// 26.3 by /rustmi explosion shadow): 1352 rays
 // (the 16³ surface), step 0.3, per-step resistance decrement
 // (res + 0.3f) * 0.3f and the inter-step 0.22500001f budget burn — all in
 // the same float widths vanilla uses (f32 power math, f64 position

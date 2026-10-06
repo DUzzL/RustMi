@@ -24,36 +24,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Phase R0 of the vanilla-exact redstone campaign
- * (docs/REDSTONE_VANILLA_PLAN.md): a ground-truth recorder around vanilla's
- * {@code DefaultRedstoneWireEvaluator}. Captures, per neighbor-update drain
- * burst, the wire network snapshot at first wire evaluation plus the exact
- * ordered event stream the cascade produced:
+ * Network walk and signal reads for the redstone engine ({@link #walkNetwork},
+ * {@link Node}, {@link BlockSignalReader}, used by {@link CascadeEngine} and
+ * {@link NetworkCache}), plus a ground-truth recorder around vanilla's
+ * {@code DefaultRedstoneWireEvaluator}. The recorder captures, per neighbor-update drain
+ * burst, the wire network snapshot at the first wire evaluation plus the exact ordered
+ * event stream the cascade produced:
  * <pre>
  *   EVAL pos oldPower          — evaluator.updatePowerStrength entered
  *   SET  pos newPower          — the wire state write (intermediate values!)
  *   UPD  pos                   — Level.updateNeighborsAt emission centre
  * </pre>
- * These fixtures are the R1 kernel's unit-test oracle: the Rust replay must
- * reproduce the SET/UPD subsequence bit-for-bit (including the
- * HashSet-iteration order and CollectingNeighborUpdater queue discipline that
- * shape vanilla's locational behavior).
+ * These fixtures ({@code fixtures/redstone/}) are the Rust replay's unit-test oracle: it
+ * must reproduce the SET/UPD subsequence bit for bit, including the HashSet iteration
+ * order and the CollectingNeighborUpdater queue discipline.
  *
- * <p>Off by default; toggle at runtime with
- * {@code /rustmi redstone record on|off|status} (ops). The state persists
- * to {@code config/rustmi/redstone-recorder.properties} across restarts —
- * no JVM flags involved. When disabled, every hook is a single volatile-read
- * early-out (~1 ns). Recording state is per-thread — Fabrolia region workers
- * each record their own bursts independently; a runtime toggle bumps a
- * generation counter that invalidates any mid-flight per-thread burst.
+ * <p>Recording and the R2 shadow ({@link CascadeShadow}) are off and have no command:
+ * {@code enabled=true} in {@code config/rustmi/redstone-recorder.properties} or
+ * {@code redstone-shadow.properties} turns them on at startup; fixtures go to
+ * {@code rustmi-redstone-fixtures/} in the server directory. While off, every hook is a
+ * single volatile-read early-out. Recording state is per-thread (Fabrolia region workers
+ * record their own bursts); a toggle bumps a generation counter that invalidates any
+ * mid-flight burst.
  *
- * <p>Vanilla 26.1 mechanics this is designed around: cascades are NOT
- * recursive — {@code CollectingNeighborUpdater} flattens them into an
- * iterative drain, so one logical cascade is a SEQUENCE of depth-0 evaluator
- * calls inside one outermost {@code addAndRun}. Burst boundaries therefore
- * come from the updater mixin, not from evaluator nesting. A burst whose
- * later evaluator calls touch wires OUTSIDE the first call's network closure
- * is flagged {@code multiNetwork} (R1 v1 discards those fixtures).
+ * <p>Vanilla mechanics this is designed around: cascades are NOT recursive —
+ * {@code CollectingNeighborUpdater} flattens them into an iterative drain, so one logical
+ * cascade is a SEQUENCE of depth-0 evaluator calls inside one outermost {@code addAndRun}.
+ * Burst boundaries therefore come from the updater mixin, not from evaluator nesting. A
+ * burst whose later evaluator calls touch wires OUTSIDE the first call's network closure
+ * is flagged {@code multiNetwork}; the Rust fixture tests skip those.
  */
 public final class CascadeRecorder {
 
@@ -61,8 +60,7 @@ public final class CascadeRecorder {
     private static final int MAX_NETWORK = 4096;
     private static final int MAX_EVENTS = 200_000;
 
-    // Runtime-toggleable (/rustmi redstone record on|off|status), persisted
-    // across restarts. No JVM flags — launch lines stay clean.
+    // Read once at startup; see the class javadoc.
     private static final Path STATE_FILE = Paths.get("config", "rustmi", "redstone-recorder.properties");
     private static final Path SHADOW_STATE_FILE = Paths.get("config", "rustmi", "redstone-shadow.properties");
     private static volatile boolean enabled = loadPersisted(STATE_FILE);

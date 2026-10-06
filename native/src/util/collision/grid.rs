@@ -2,7 +2,7 @@
 // single-box quarantine comment anticipated: per-box flattening diverges from
 // vanilla at internal/coplanar faces by 5e-9-class clamps).
 //
-// Exact ports from /tmp/vansrc (yarn 26.1.2):
+// Exact ports of (yarn names, 26.1.2 sources):
 //   VoxelShape.calculateMaxDistance(AxisCycleDirection, Box, double)
 //   VoxelShape.getCoordIndex (binarySearch first-above semantics)
 //   AxisCycleDirection algebra: collide(axis) walks slabs of the MOVEMENT

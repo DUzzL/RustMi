@@ -1,5 +1,5 @@
-// Vanilla-exact entity collision over FULL-CUBE colliders (C1 of the
-// collision campaign, docs/ + fixtures/collision/*.json).
+// Vanilla-exact entity collision over FULL-CUBE colliders (oracle:
+// fixtures/collision/*.json, recorded from vanilla).
 //
 // Port of Entity.adjustMovementForCollisions(Vec3d) for the case the C0
 // classifier showed dominates (~80%): every candidate collider is a full

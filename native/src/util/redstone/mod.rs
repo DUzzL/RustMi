@@ -1,6 +1,6 @@
-// Vanilla-exact redstone replay core (campaign phase R1, see
-// docs/REDSTONE_VANILLA_PLAN.md). Two pure-math pillars of vanilla's update
-// ORDER, ported 1:1 from extracted 26.1.2 sources and tested against
+// Vanilla-exact redstone wire replay (see docs/CODEMAP.md, "Redstone wire").
+// Two pure-math pillars of vanilla's update ORDER, ported 1:1 from the 26.1.2
+// sources (checked against 26.3 by the parity harness) and tested against
 // Java-generated ground truth:
 //
 //   jorder    — BlockPos.hashCode + java.util.HashSet iteration order of the
@@ -9,8 +9,8 @@
 //               queue discipline: stack + pending + depth budget, SixWay
 //               generator entries with except-skips (the cascade shape).
 //
-// The wire-evaluator simulation that plugs into these lands with the R0
-// fixtures (rustmi-redstone-fixtures/) as its oracle.
+// sim.rs composes both into the wire-evaluator replay; its oracle is the
+// recorded cascades in fixtures/redstone/.
 pub mod collector;
 pub mod ffi;
 pub mod jorder;

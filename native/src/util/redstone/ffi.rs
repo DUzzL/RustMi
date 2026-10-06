@@ -1,6 +1,6 @@
-//! FFI for the R2 shadow engine: Java marshals a burst's network snapshot,
-//! drives entries (adaptively retrying the two disciplines via undo), and
-//! reads back the predicted event stream to diff against vanilla's.
+//! FFI for the wire-cascade replay: Java (CascadeEngine for the R3 takeover,
+//! CascadeShadow for the R2 compare) marshals a network snapshot, drives entries
+//! and reads back the event script. Only CascadeShadow uses `undo`.
 //!
 //! Layouts (i32 everywhere, native endianness):
 //!   node record (28 B): x, y, z, pw, sp, edge_start, edge_len

@@ -27,6 +27,7 @@ public final class NalimBindings {
         }
         Linker.linkClass(NalimBindings.class);
     }
+
     // ====================================================================
     // Ferrite-style batched cramming kernel.
     //
@@ -49,8 +50,7 @@ public final class NalimBindings {
     @Link(name = "oxi_cramming_batch")
     public static native void oxi_cramming_batch(long inputsAddr, long outputsAddr, int n);
 
-    /** Returns {@code sizeof(CrammingInput)} — 64. Used as a runtime
-     *  layout check by RustmiCramming. */
+    /** Returns {@code sizeof(CrammingInput)} — 64. Checked at startup (NativeBackend, CrammingHooks). */
     @Critical
     @Link(name = "oxi_cramming_input_size")
     public static native int oxi_cramming_input_size();

@@ -7,9 +7,6 @@ edition = "2021"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
-[features]
-default = []
-
 [dependencies]
 parking_lot = "0.12.5"
 

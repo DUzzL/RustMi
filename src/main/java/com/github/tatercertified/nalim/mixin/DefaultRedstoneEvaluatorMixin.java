@@ -18,10 +18,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * R0 recorder taps on vanilla's default wire evaluator
- * (docs/REDSTONE_VANILLA_PLAN.md). Pure observation — every original
- * operation is invoked unchanged; when {@code -Drustmi.redstone.record}
- * is absent all handlers JIT-fold to no-ops.
+ * Taps on vanilla's default wire evaluator: the R3 takeover entry
+ * ({@link CascadeEngine#onEvaluatorEnter}, which may cancel the evaluation because the
+ * script already applied it) and the fixture-recorder hooks of {@link CascadeRecorder}
+ * (single volatile reads while the recorder is off). The WrapOperations only observe.
  *
  * <p>Extends {@link RedstoneWireEvaluator} (the target's superclass) to reach
  * the protected {@code getBlockSignal} for network snapshots — same pattern

@@ -1,5 +1,5 @@
 //! ChainRestrictedNeighborUpdater (mojmap CollectingNeighborUpdater)
-//! queue discipline, ported 1:1 from the extracted 26.1.2 source. Pure
+//! queue discipline, ported 1:1 from the 26.1.2 source (unchanged in 26.3). Pure
 //! math — no world access — exactly as observed:
 //!
 //! ```text

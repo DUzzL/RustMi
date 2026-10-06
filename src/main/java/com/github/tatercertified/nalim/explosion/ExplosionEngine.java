@@ -41,7 +41,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * E-campaign engine (docs/EXPLOSION_PLAN.md): vanilla-exact explosions with
+ * Explosion engine (docs/CODEMAP.md, "Explosions"): vanilla-exact explosions with
  * the heavy math in Rust.
  *
  * <ul>

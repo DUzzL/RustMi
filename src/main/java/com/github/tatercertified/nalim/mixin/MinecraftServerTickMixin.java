@@ -11,9 +11,8 @@ import java.util.function.BooleanSupplier;
 
 /**
  * Hooks the cramming pre-phase into {@code MinecraftServer.tickServer} —
- * fires once per tick BEFORE all level ticks. This avoids needing
- * fabric-api on the nalim subproject's classpath while keeping the same
- * lifecycle as a Fabric START_SERVER_TICK event.
+ * fires once per tick BEFORE all level ticks: the lifecycle of Fabric API's
+ * START_SERVER_TICK without depending on Fabric API.
  *
  * <p>Priority 900 is intentionally lower than Fabrolia's 1500 so that
  * Fabrolia's tick orchestration mixins compose later; we only want the

@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * R3 takeover engine (docs/REDSTONE_VANILLA_PLAN.md): replace vanilla wire
+ * R3 takeover engine (docs/CODEMAP.md, "Redstone wire"): replace vanilla wire
  * cascades with the Rust simulator's precomputed event script, emitted through
  * the SAME world calls vanilla makes — {@code setBlock(pos, POWER, flags=2)}
  * and {@code updateNeighborsAt(pos, wire)} — in the SAME order. Non-wire
