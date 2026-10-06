@@ -8,4 +8,4 @@ pluginManagement {
     }
 }
 
-include("testMod", "rustmi", "nalim")
+include("rustmi", "nalim")

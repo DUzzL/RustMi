@@ -136,12 +136,6 @@ tasks.register('compileLocally') {
     dependsOn tasks.named('crossNatives')
     dependsOn tasks.named('generateSatelliteResources')
     dependsOn project(':nalim').tasks.named('build')
-    dependsOn project(':testMod').tasks.named('build')
-}
-
-tasks.register('devRustmiBuild') {
-    dependsOn project(':testMod').tasks.named('build')
-    mustRunAfter 'crossNatives'
 }
 
 // The nalim project is the single distributed mod: it embeds the base mod, every native
@@ -208,10 +202,6 @@ tasks.register("generateSatelliteResources") {
 
 
 // - - - - Task Configuration - - - - \\
-
-project(':testMod').tasks.named('build').configure {
-    dependsOn tasks.named('hashLib')
-}
 
 project(':rustmi').tasks.named('processResources').configure {
     dependsOn rootProject.tasks.named('hashLib')
