@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "${modid}",
+  "version": "${version}",
+  "name": "${mod}",
+  "description": "Implementing Minecraft In Rust",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/rustmi/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.github.tatercertified.rustmi.Rustmi"
+    ],
+    "mixinsquared": [
+      "com.github.tatercertified.rustmi.compat.DebugifyMixinCanceller"
+    ]
+  },
+  "mixins": [
+    "rustmi.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": "*",
+    "minecraft": "~${minecraft_version}",
+    "java": "${java_ver}"
+  },
+  "custom": {
+    "lithium:options": {
+      "math.sine_lut": false,
+      "chunk.serialization": false
+    }
+  }
+}

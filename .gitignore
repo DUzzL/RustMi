@@ -1,0 +1,18 @@
+# Build outputs
+.gradle/
+build/
+/native/target/
+*.so
+*.dll
+*.dylib
+*.hash
+
+# Local data (see AGENTS.md): parity stand and release jars
+/stand/
+/release/
+
+# IDE / tooling
+/.idea/
+/.vs/
+*.iml
+__pycache__/

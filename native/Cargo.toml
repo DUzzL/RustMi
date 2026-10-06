@@ -1,0 +1,31 @@
+[package]
+name = "rustmi"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[features]
+default = []
+
+[dependencies]
+parking_lot = "0.12.5"
+
+# macOS keeps the system allocator: mimalloc v3 needs CommonCrypto headers that the zig
+# toolchain able to link Mach-O dylibs (0.14) does not ship.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+mimalloc = {git = "https://github.com/ralfbiedert/mimalloc_rust", features = ["v3"]}
+
+[build-dependencies]
+cbindgen = "0.29.2"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
+opt-level = 3
+strip = "symbols"
+[dev-dependencies]
+serde_json = { version = "1", features = ["float_roundtrip"] }

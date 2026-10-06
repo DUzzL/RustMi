@@ -1,0 +1,53 @@
+name: Create Rustmi
+
+on:
+  workflow_dispatch :
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # One job, same steps as a local `./gradlew compileLocally`: cargo-zigbuild cross-compiles
+  # the native library for all six platforms and Gradle packs them into one jar.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Rust targets
+        run: rustup target add aarch64-unknown-linux-gnu x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm x86_64-apple-darwin aarch64-apple-darwin
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          # 0.16 cannot link the macOS libraries.
+          version: 0.14.1
+
+      - name: Install cargo-zigbuild
+        run: cargo install cargo-zigbuild --locked --version 0.23.4
+
+      - name: Native tests
+        run: |
+          cd native
+          cargo test --release --locked
+
+      - name: Setup JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 25
+
+      - name: Make Gradlew Executable
+        run: chmod +x gradlew
+
+      - name: Build
+        run: ./gradlew compileLocally --no-daemon
+
+      - name: Upload Rustmi
+        uses: actions/upload-artifact@v6
+        with:
+          name: rustmi
+          path: |
+            nalim/build/libs/*.jar
+            !nalim/build/libs/*-sources.jar
+          compression-level: 0

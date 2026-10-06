@@ -1,0 +1,230 @@
+import java.security.MessageDigest
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.15-SNAPSHOT' apply false
+}
+
+subprojects {
+    apply plugin: 'net.fabricmc.fabric-loom'
+    apply plugin: 'java'
+
+    repositories {
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+        maven { url = "https://maven.bawnorton.com/releases" }
+        maven {
+            name = "Modrinth"
+            url = "https://api.modrinth.com/maven"
+        }
+    }
+
+    dependencies {
+        // To change the versions see the gradle.properties file
+        minecraft "com.mojang:minecraft:${project.minecraft_version}"
+        implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+        include(implementation 'org.joml:joml:1.10.8')
+        include(implementation 'com.github.Tater-Certified:MixinConstraints:4856759a06')
+        include(implementation "com.github.zafarkhaja:java-semver:0.10.2")
+    }
+}
+def sha256Hex = { File inputFile ->
+    MessageDigest digest = MessageDigest.getInstance('SHA-256')
+    inputFile.withInputStream { input ->
+        byte[] buffer = new byte[8192]
+        int read
+        while ((read = input.read(buffer)) != -1) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    digest.digest().encodeHex().toString()
+}
+
+// - - - - Native library: every platform in one jar - - - - \\
+
+// Packaged resource name (read by LoadRustBinary) → Rust target. Linux targets pin
+// glibc 2.17 so the library loads on every maintained distribution.
+def nativeTargets = [
+        'librustmi_linux_x86.so'     : [target: 'x86_64-unknown-linux-gnu.2.17', dir: 'x86_64-unknown-linux-gnu', file: 'librustmi.so'],
+        'librustmi_linux_arm64.so'   : [target: 'aarch64-unknown-linux-gnu.2.17', dir: 'aarch64-unknown-linux-gnu', file: 'librustmi.so'],
+        'rustmi_windows_x86.dll'     : [target: 'x86_64-pc-windows-gnu', dir: 'x86_64-pc-windows-gnu', file: 'rustmi.dll'],
+        'rustmi_windows_arm64.dll'   : [target: 'aarch64-pc-windows-gnullvm', dir: 'aarch64-pc-windows-gnullvm', file: 'rustmi.dll'],
+        'librustmi_mac_x86.dylib'    : [target: 'x86_64-apple-darwin', dir: 'x86_64-apple-darwin', file: 'librustmi.dylib'],
+        'librustmi_mac_arm64.dylib'  : [target: 'aarch64-apple-darwin', dir: 'aarch64-apple-darwin', file: 'librustmi.dylib'],
+]
+
+// Cross-compiles all six libraries on one machine with cargo-zigbuild. Needs the rustup
+// targets above and zig 0.14.x (0.16 cannot link macOS dylibs) — on PATH, or set ZIG to
+// the zig binary.
+def zigBinary = System.getenv('ZIG')
+def crossTasks = nativeTargets.collect { packaged, spec ->
+    tasks.register("cargo_${spec.dir.replace('-', '_')}", Exec) {
+        inputs.dir('native/src')
+        inputs.files('native/Cargo.toml', 'native/Cargo.lock', 'native/build.rs')
+        outputs.file("native/target/${spec.dir}/release/${spec.file}")
+        workingDir 'native'
+        if (zigBinary != null && !zigBinary.isBlank()) {
+            environment 'PATH', new File(zigBinary).parentFile.absolutePath + File.pathSeparator + System.getenv('PATH')
+        }
+        // zig cc turns mimalloc's __DATE__ use into an error; the date is cosmetic there.
+        environment "CFLAGS_${spec.dir.replace('-', '_')}", '-Wno-error=date-time -Wno-date-time'
+        // Rust's own minimum for Apple Silicon; zig would otherwise stamp its host default.
+        environment 'MACOSX_DEPLOYMENT_TARGET', '11.0'
+        commandLine 'cargo', 'zigbuild', '--release', '--locked', '--target', spec.target
+    }
+}
+
+tasks.register('crossNatives') {
+    // The freshly built libraries are inputs, so a Rust change always re-copies them.
+    inputs.files(crossTasks)
+    outputs.files(nativeTargets.keySet().collect { file(it) })
+
+    doLast {
+        nativeTargets.each { packaged, spec ->
+            def built = file("native/target/${spec.dir}/release/${spec.file}")
+            if (!built.isFile()) {
+                throw new GradleException("cargo zigbuild did not produce ${built}")
+            }
+            copy {
+                from built
+                into projectDir
+                rename { packaged }
+            }
+        }
+    }
+}
+
+tasks.register('moveBinaries') {
+    mustRunAfter tasks.named('crossNatives')
+
+    doLast {
+        def resourceDir = file('rustmi/src/main/resources')
+        resourceDir.mkdirs()
+        def missing = nativeTargets.keySet().findAll { !file(it).isFile() }
+        if (!missing.isEmpty()) {
+            throw new GradleException("Missing native libraries ${missing}; run compileLocally " +
+                    "(cargo-zigbuild) or place the CI artifacts in the project root. " +
+                    "Refusing to package a jar that would fail on those platforms.")
+        }
+        nativeTargets.keySet().each { fileName ->
+            copy {
+                from file(fileName)
+                into resourceDir
+            }
+        }
+        println "Copied ${nativeTargets.size()} native libraries to ${resourceDir}"
+    }
+}
+
+tasks.register('hashLib') {
+    dependsOn tasks.named('moveBinaries')
+
+    doLast {
+        nativeTargets.keySet().each { fileName ->
+            def f = file("rustmi/src/main/resources/${fileName}")
+            if (!f.isFile()) {
+                throw new GradleException("Missing packaged native library ${f}")
+            }
+            def baseName = fileName.substring(0, fileName.lastIndexOf('.'))
+            file("rustmi/src/main/resources/${baseName}.hash").text = sha256Hex(f)
+        }
+    }
+}
+
+tasks.register('compileLocally') {
+    dependsOn tasks.named('crossNatives')
+    dependsOn tasks.named('generateSatelliteResources')
+    dependsOn project(':nalim').tasks.named('build')
+    dependsOn project(':testMod').tasks.named('build')
+}
+
+tasks.register('devRustmiBuild') {
+    dependsOn project(':testMod').tasks.named('build')
+    mustRunAfter 'crossNatives'
+}
+
+// The nalim project is the single distributed mod: it embeds the base mod, every native
+// library and both native backends (Nalim/JVMCI, FFM), choosing one at startup.
+def satelliteResources = [
+        [satellite: project(':nalim'), mixinConfig: 'rustmi_nalim.mixins.json',
+         accessWidener: 'rustmi_nalim.accesswidener',
+         breaks: ['rustmi_nalim', 'rustmi_panama', 'rustmi_membrane']]
+]
+satelliteResources.each { target ->
+    target.outputDir = layout.buildDirectory.dir(
+            "generated/satelliteResources/${target.satellite.name}")
+}
+
+tasks.register("generateSatelliteResources") {
+    dependsOn tasks.named('hashLib')
+    def sourceDir = file("rustmi/src/main/resources")
+    def sourceAssets = new File(sourceDir, "assets")
+    def sourceJson = new File(sourceDir, "fabric.mod.json")
+
+    inputs.dir(sourceAssets)
+    inputs.file(sourceJson)
+    outputs.dirs(satelliteResources.collect { it.outputDir })
+
+    doLast {
+        if (!sourceJson.isFile()) {
+            throw new GradleException("Missing base metadata: ${sourceJson}")
+        }
+
+        satelliteResources.each { target ->
+            def targetDir = target.outputDir.get().asFile
+            delete targetDir
+            targetDir.mkdirs()
+
+            copy {
+                from sourceAssets
+                into new File(targetDir, "assets")
+            }
+
+            def jsonContent = new JsonSlurper().parse(sourceJson)
+            jsonContent.remove("entrypoints")
+            if (target.mixinConfig == null) {
+                jsonContent.remove("mixins")
+            } else if (jsonContent.mixins instanceof List) {
+                jsonContent.mixins = jsonContent.mixins.collect { mixin ->
+                    mixin == "rustmi.mixins.json" ? target.mixinConfig : mixin
+                }
+            }
+            jsonContent.remove("custom")
+            if (target.accessWidener != null) {
+                jsonContent.accessWidener = target.accessWidener
+            }
+            if (target.breaks != null) {
+                // The former per-backend jars ship the same packages and mixins.
+                jsonContent.breaks = target.breaks.collectEntries { [(it): '*'] }
+            }
+
+            def targetJson = new File(targetDir, "fabric.mod.json")
+            targetJson.text = JsonOutput.prettyPrint(JsonOutput.toJson(jsonContent))
+            println "Generated satellite resources for ${target.satellite.path} in ${targetDir}"
+        }
+    }
+}
+
+
+// - - - - Task Configuration - - - - \\
+
+project(':testMod').tasks.named('build').configure {
+    dependsOn tasks.named('hashLib')
+}
+
+project(':rustmi').tasks.named('processResources').configure {
+    dependsOn rootProject.tasks.named('hashLib')
+}
+
+satelliteResources.each { target ->
+    target.satellite.sourceSets.main.resources.srcDir(target.outputDir)
+    target.satellite.tasks.named('processResources').configure {
+        dependsOn rootProject.tasks.named('generateSatelliteResources')
+    }
+    target.satellite.tasks.withType(Jar).configureEach {
+        if (name == 'sourcesJar') {
+            dependsOn rootProject.tasks.named('generateSatelliteResources')
+        }
+    }
+}
