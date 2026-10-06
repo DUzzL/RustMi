@@ -1,70 +1,10 @@
-version = project.rustmi_version
-group = project.maven_group
+// Applied from build.gradle. Generates the two Java views of the native surface from
+// src/main/java/com/github/tatercertified/nalim/rust/NalimBindings.java:
+//  * RustmiLib   (main source set) — the facade every caller uses; one static final branch,
+//                                    folded by the JIT, picks Nalim or FFM (NativeBackend);
+//  * FfmBindings (ffm source set)  — Foreign Function & Memory downcalls, compiled for Java 25.
+// NativeBindingsContractTest checks both against native/lib.h (cbindgen output).
 
-base {
-    archivesName = project.archives_base_name
-}
-
-repositories {
-    // Treat libs/ as a flat-dir Maven repository so Loom's include() will accept
-    // the local nalim.jar (include() refuses raw file-tree entries — needs
-    // "module components with capabilities").
-    flatDir {
-        dirs 'libs'
-    }
-}
-
-def vendoredLibraries = [
-        [file: file('libs/nalim.jar'),
-         sha256: '069ca95d85681156de69c105ed4eb08366bb92017fb619a58eb8fc8d743651bb'],
-        [file: file('libs/fabrolia-compile.jar'),
-         sha256: '747d295cd698c266d8490af5c3da0b3a0902188de877f96b0e20ee341eb1856e']
-]
-
-tasks.register('verifyVendoredLibraries') {
-    inputs.files(vendoredLibraries.collect { it.file })
-
-    doLast {
-        vendoredLibraries.each { library ->
-            if (!library.file.isFile()) {
-                throw new GradleException("Missing vendored library: ${library.file}")
-            }
-            def actual = java.security.MessageDigest.getInstance('SHA-256')
-                    .digest(library.file.bytes)
-                    .encodeHex()
-                    .toString()
-            if (actual != library.sha256) {
-                throw new GradleException(
-                        "SHA-256 mismatch for ${library.file.name}: expected ${library.sha256}, got ${actual}")
-            }
-        }
-    }
-}
-
-dependencies {
-    implementation include(project(":rustmi"))
-    // Compile-only visibility for @TargetHandler (LithiumExplosionFloatCaptureMixin);
-    // runtime classes come JiJ'd inside the base rustmi jar.
-    implementation annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-fabric:0.3.3")
-    // JiJ nalim.jar. Fabric will treat it as a library mod (it ships its own
-    // fabric.mod.json) and expose one.nalim.* via knot to every other mod.
-    // Removes the need for -cp / -javaagent on the launch line.
-    implementation include(group: '', name: 'nalim', version: '1.2.1-patched-autoinline', ext: 'jar')
-
-    // Fabrolia remains a soft runtime dependency. This pinned jar is compile
-    // surface only and is never included in the RustMI satellite.
-    compileOnly files('libs/fabrolia-compile.jar')
-}
-
-loom {
-    accessWidenerPath = file('src/main/resources/rustmi_nalim.accesswidener')
-}
-
-// - - - - Native bindings: one declaration list, two backends - - - - \\
-// NalimBindings.java declares every native function once. From it the build generates
-//  * RustmiLib   (main)  — the facade every caller uses; one static final branch, folded by
-//                         the JIT, picks Nalim or FFM as selected by NativeBackend;
-//  * FfmBindings (ffm)   — Foreign Function & Memory downcalls, compiled for Java 25.
 def bindingsSource = file('src/main/java/com/github/tatercertified/nalim/rust/NalimBindings.java')
 def generatedFacadeDir = layout.buildDirectory.dir('generated/nativeBindings/main')
 def generatedFfmDir = layout.buildDirectory.dir('generated/nativeBindings/ffm')
@@ -133,7 +73,7 @@ tasks.register('generateNativeBindings') {
 
         def facade = new StringBuilder()
         facade << "package ${pkg};\n\n"
-        facade << "/** GENERATED from NalimBindings.java by :nalim:generateNativeBindings — do not edit. */\n"
+        facade << "/** GENERATED from NalimBindings.java by gradle/native-bindings.gradle — edit NalimBindings.java instead. */\n"
         facade << "public final class RustmiLib {\n"
         facade << "    private RustmiLib() {}\n\n"
         facade << "    /** Decided once by NativeBackend before any caller runs; folded by the JIT. */\n"
@@ -157,7 +97,7 @@ tasks.register('generateNativeBindings') {
         ffm << "import java.lang.foreign.SymbolLookup;\nimport java.lang.invoke.MethodHandle;\n"
         ffm << "import java.nio.file.Path;\n\n"
         ffm << "import static java.lang.foreign.ValueLayout.*;\n\n"
-        ffm << "/**\n * GENERATED from NalimBindings.java by :nalim:generateNativeBindings — do not edit.\n"
+        ffm << "/**\n * GENERATED from NalimBindings.java by gradle/native-bindings.gradle — edit NalimBindings.java instead.\n"
         ffm << " * Foreign Function &amp; Memory downcalls into the library at {@code rustmi.native.path}.\n"
         ffm << " * Pointers travel as JAVA_LONG (all supported targets are LP64/LLP64); calls marked\n"
         ffm << " * {@code @Critical} skip the thread-state transition, like every Nalim call.\n */\n"
@@ -205,118 +145,4 @@ tasks.register('generateNativeBindings') {
         ffmFile.text = ffm.toString()
         println "Generated ${functions.size()} native bindings (Nalim facade + FFM)"
     }
-}
-
-def targetJavaVersion = 17
-tasks.withType(JavaCompile).configureEach {
-    dependsOn tasks.named('verifyVendoredLibraries')
-    dependsOn tasks.named('generateNativeBindings')
-    // ensure that the encoding is set to UTF-8, no matter what the system default is
-    // this fixes some edge cases with special characters not displaying correctly
-    // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
-    // If Javadoc is generated, this must be specified in that task too.
-    it.options.encoding = "UTF-8"
-    // java.lang.foreign is final since Java 22; everything else stays at the mixins' level.
-    it.options.release.set(name == 'compileFfmJava' ? 25 : targetJavaVersion)
-}
-
-tasks.withType(Jar).configureEach {
-    if (name == 'sourcesJar') {
-        dependsOn tasks.named('generateNativeBindings')
-        from(sourceSets.ffm.allSource)
-    }
-}
-
-processResources {
-    inputs.property "version", project.version
-    inputs.property "minecraft_version", project.minecraft_version
-    inputs.property "loader_version", project.loader_version
-    inputs.property "modid", project.modid
-    inputs.property "mod", project.mod
-    inputs.property "java_ver", project.java_ver
-    filteringCharset "UTF-8"
-
-    filesMatching("fabric.mod.json") {
-        expand "version": project.version,
-                "minecraft_version": project.minecraft_version,
-                "loader_version": project.loader_version,
-                "modid": project.modid,
-                "mod": project.mod,
-                "java_ver": project.java_ver
-    }
-}
-
-java {
-    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
-    if (JavaVersion.current() < javaVersion) {
-        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
-    }
-    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-    // if it is present.
-    // If you remove this line, sources will not be generated.
-    withSourcesJar()
-}
-
-jar {
-    from(sourceSets.ffm.output)
-    from("LICENSE") {
-        rename { "${it}_${project.archives_base_name}" }
-    }
-}
-
-tasks.register('nativeBindingsContractTest', JavaExec) {
-    group = 'verification'
-    description = 'Checks the generated Nalim/FFM bindings against each other and the C header.'
-    dependsOn tasks.named('testClasses')
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass.set('com.github.tatercertified.nalim.rust.NativeBindingsContractTest')
-    // cbindgen (native/build.rs) regenerates the header on every cargo build.
-    args rootProject.file('native/lib.h').absolutePath
-    mustRunAfter rootProject.tasks.named('crossNatives')
-}
-
-tasks.register('activeRegionBatchesTest', JavaExec) {
-    group = 'verification'
-    description = 'Checks exact-id regional batch routing and JMM publication.'
-    dependsOn tasks.named('testClasses')
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass.set('com.github.tatercertified.nalim.cramming.ActiveRegionBatchesTest')
-}
-
-tasks.register('regionalCrammingGeometryTest', JavaExec) {
-    group = 'verification'
-    description = 'Checks regional cramming halo coverage boundaries.'
-    dependsOn tasks.named('testClasses')
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass.set('com.github.tatercertified.nalim.cramming.RegionalCrammingGeometryTest')
-}
-
-tasks.register('collisionCompatibilityTest', JavaExec) {
-    group = 'verification'
-    description = 'Checks collision fallback precision and mover-predicate gates.'
-    dependsOn tasks.named('testClasses')
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass.set('com.github.tatercertified.nalim.collision.CollisionCompatibilityTest')
-}
-
-tasks.register('explosionSeenClipTest', JavaExec) {
-    group = 'verification'
-    description = 'Checks full-cube exposure rays against Minecraft shape clipping.'
-    dependsOn tasks.named('testClasses')
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass.set('com.github.tatercertified.nalim.explosion.ExplosionSeenClipTest')
-}
-
-tasks.named('test') {
-    // The deterministic fixture above is a plain Java main so it can run
-    // offline without adding a test-framework dependency.
-    failOnNoDiscoveredTests = false
-}
-
-tasks.named('check') {
-    dependsOn tasks.named('activeRegionBatchesTest')
-    dependsOn tasks.named('regionalCrammingGeometryTest')
-    dependsOn tasks.named('collisionCompatibilityTest')
-    dependsOn tasks.named('explosionSeenClipTest')
-    dependsOn tasks.named('nativeBindingsContractTest')
 }

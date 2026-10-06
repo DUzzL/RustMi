@@ -1,0 +1,70 @@
+// Applied from build.gradle. Cross-compiles the Rust library (native/) for every supported
+// platform with cargo-zigbuild and packs all six into the jar; LoadRustBinary extracts the
+// one matching the running JVM. Needs the rustup targets below and zig 0.14.x
+// (tools/setup-toolchain.sh installs both; zig 0.15+ cannot link the macOS libraries).
+// zig is taken from $ZIG, else ~/.local/opt/zig-0.14.1/zig, else PATH.
+
+import java.security.MessageDigest
+
+// Jar resource name (LoadRustBinary picks by OS/arch) → Rust target. The Linux targets pin
+// glibc 2.17 so the library loads on every maintained distribution.
+def nativeTargets = [
+        'librustmi_linux_x86.so'   : [target: 'x86_64-unknown-linux-gnu.2.17', dir: 'x86_64-unknown-linux-gnu', file: 'librustmi.so'],
+        'librustmi_linux_arm64.so' : [target: 'aarch64-unknown-linux-gnu.2.17', dir: 'aarch64-unknown-linux-gnu', file: 'librustmi.so'],
+        'rustmi_windows_x86.dll'   : [target: 'x86_64-pc-windows-gnu', dir: 'x86_64-pc-windows-gnu', file: 'rustmi.dll'],
+        'rustmi_windows_arm64.dll' : [target: 'aarch64-pc-windows-gnullvm', dir: 'aarch64-pc-windows-gnullvm', file: 'rustmi.dll'],
+        'librustmi_mac_x86.dylib'  : [target: 'x86_64-apple-darwin', dir: 'x86_64-apple-darwin', file: 'librustmi.dylib'],
+        'librustmi_mac_arm64.dylib': [target: 'aarch64-apple-darwin', dir: 'aarch64-apple-darwin', file: 'librustmi.dylib'],
+]
+
+def zigBinary = System.getenv('ZIG') ?: new File(System.getProperty('user.home'), '.local/opt/zig-0.14.1/zig').with {
+    it.canExecute() ? it.absolutePath : null
+}
+def nativeSources = [file('native/src'), file('native/Cargo.toml'), file('native/Cargo.lock'), file('native/build.rs')]
+
+def cargoTasks = nativeTargets.collect { packaged, spec ->
+    tasks.register("cargo_${spec.dir.replace('-', '_')}", Exec) {
+        group = 'native'
+        description = "Builds native/ for ${spec.target}."
+        inputs.files(nativeSources)
+        outputs.file("native/target/${spec.dir}/release/${spec.file}")
+        workingDir 'native'
+        if (zigBinary != null) {
+            environment 'PATH', new File(zigBinary).parentFile.absolutePath + File.pathSeparator + System.getenv('PATH')
+        }
+        // zig cc turns mimalloc's __DATE__ use into an error; the date is cosmetic there.
+        environment "CFLAGS_${spec.dir.replace('-', '_')}", '-Wno-error=date-time -Wno-date-time'
+        // Rust's own minimum for Apple Silicon; zig would otherwise stamp its host default.
+        environment 'MACOSX_DEPLOYMENT_TARGET', '11.0'
+        commandLine 'cargo', 'zigbuild', '--release', '--locked', '--target', spec.target
+    }
+}
+
+def packagedNativesDir = layout.buildDirectory.dir('generated/natives')
+
+// Copies the six libraries under their jar names and writes <name>.hash (SHA-256) beside
+// each; LoadRustBinary re-extracts libraries/rustmi/<lib> when the hash differs.
+def packageNatives = tasks.register('packageNatives') {
+    group = 'native'
+    description = 'Collects the cross-compiled libraries and their SHA-256 into the jar resources.'
+    inputs.files(cargoTasks)
+    outputs.dir(packagedNativesDir)
+
+    doLast {
+        def outDir = packagedNativesDir.get().asFile
+        project.delete(outDir)
+        outDir.mkdirs()
+        nativeTargets.each { packaged, spec ->
+            def built = file("native/target/${spec.dir}/release/${spec.file}")
+            if (!built.isFile()) {
+                throw new GradleException("cargo zigbuild did not produce ${built}")
+            }
+            def dest = new File(outDir, packaged)
+            dest.bytes = built.bytes
+            def digest = MessageDigest.getInstance('SHA-256').digest(dest.bytes).encodeHex().toString()
+            new File(outDir, packaged.substring(0, packaged.lastIndexOf('.')) + '.hash').text = digest
+        }
+    }
+}
+
+sourceSets.main.resources.srcDir(files(packagedNativesDir).builtBy(packageNatives))

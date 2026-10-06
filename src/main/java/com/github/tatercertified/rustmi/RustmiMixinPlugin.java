@@ -1,5 +1,8 @@
 package com.github.tatercertified.rustmi;
 
+import com.github.tatercertified.nalim.NativeBackend;
+import com.github.tatercertified.nalim.cramming.CrammingHooks;
+import com.github.tatercertified.nalim.spawncap.SpawnCapHooks;
 import com.moulberry.mixinconstraints.MixinConstraints;
 import com.moulberry.mixinconstraints.mixin.MixinConstraintsBootstrap;
 import org.objectweb.asm.tree.ClassNode;
@@ -9,18 +12,26 @@ import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Plugin of {@code rustmi.mixins.json} and Rustmi's startup: Mixin calls {@link #onLoad}
+ * once, before it transforms any class, which is the earliest point a mod's code runs.
+ * Mixin constraints ({@code @IfModLoaded} etc.) are evaluated here as well.
+ */
 public class RustmiMixinPlugin implements IMixinConfigPlugin {
     private String mixinPackage;
 
     @Override
     public void onLoad(String s) {
-        // Native extraction must finish before a backend eagerly links its binding class.
         try {
+            // Order matters: the native library must be extracted before a backend links it,
+            // and the backend chosen before anything calls RustmiLib.
             LoadRustBinary.onPreLaunch();
-            Rustmi.BACKEND.onStartup();
+            NativeBackend.select();
+            CrammingHooks.register();
+            SpawnCapHooks.register();
         } catch (RuntimeException e) {
-            // Mixin downgrades an Exception here to a warning and still applies the satellite's
-            // mixins, which then crash in tick code; an Error stops startup with the cause.
+            // Mixin downgrades an Exception here to a warning and still applies the mixins,
+            // which then crash in tick code; an Error stops startup with the cause.
             throw new Error("RustMI cannot start: " + e.getMessage(), e);
         }
         this.mixinPackage = s;

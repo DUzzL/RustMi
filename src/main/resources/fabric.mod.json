@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "${modid}",
+  "id": "rustmi",
   "version": "${version}",
-  "name": "${mod}",
+  "name": "Rustmi",
   "description": "Implementing Minecraft In Rust",
   "authors": [],
   "contact": {},
@@ -10,9 +10,6 @@
   "icon": "assets/rustmi/icon.png",
   "environment": "*",
   "entrypoints": {
-    "main": [
-      "com.github.tatercertified.rustmi.Rustmi"
-    ],
     "mixinsquared": [
       "com.github.tatercertified.rustmi.compat.DebugifyMixinCanceller"
     ]
@@ -20,10 +17,16 @@
   "mixins": [
     "rustmi.mixins.json"
   ],
+  "accessWidener": "rustmi.accesswidener",
   "depends": {
     "fabricloader": "*",
     "minecraft": "~${minecraft_version}",
-    "java": "${java_ver}"
+    "java": ">=25"
+  },
+  "breaks": {
+    "rustmi_nalim": "*",
+    "rustmi_panama": "*",
+    "rustmi_membrane": "*"
   },
   "custom": {
     "lithium:options": {

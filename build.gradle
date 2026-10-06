@@ -1,218 +1,135 @@
-import java.security.MessageDigest
-import groovy.json.JsonSlurper
-import groovy.json.JsonOutput
-
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.15-SNAPSHOT' apply false
+    id 'net.fabricmc.fabric-loom' version '1.15-SNAPSHOT'
 }
 
-subprojects {
-    apply plugin: 'net.fabricmc.fabric-loom'
-    apply plugin: 'java'
+version = project.rustmi_version
+group = project.maven_group
 
-    repositories {
-        mavenCentral()
-        maven { url 'https://jitpack.io' }
-        maven { url = "https://maven.bawnorton.com/releases" }
-        maven {
-            name = "Modrinth"
-            url = "https://api.modrinth.com/maven"
-        }
-    }
-
-    dependencies {
-        // To change the versions see the gradle.properties file
-        minecraft "com.mojang:minecraft:${project.minecraft_version}"
-        implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-        include(implementation 'com.github.Tater-Certified:MixinConstraints:4856759a06')
-    }
-}
-def sha256Hex = { File inputFile ->
-    MessageDigest digest = MessageDigest.getInstance('SHA-256')
-    inputFile.withInputStream { input ->
-        byte[] buffer = new byte[8192]
-        int read
-        while ((read = input.read(buffer)) != -1) {
-            digest.update(buffer, 0, read)
-        }
-    }
-    digest.digest().encodeHex().toString()
+base {
+    archivesName = 'rustmi'
 }
 
-// - - - - Native library: every platform in one jar - - - - \\
+repositories {
+    mavenCentral()
+    maven { url = 'https://jitpack.io' }                       // MixinConstraints
+    maven { url = 'https://maven.bawnorton.com/releases' }     // MixinSquared
+    // libs/ as a flat-dir repository: Loom's include() needs a module component.
+    flatDir { dirs 'libs' }
+}
 
-// Packaged resource name (read by LoadRustBinary) → Rust target. Linux targets pin
-// glibc 2.17 so the library loads on every maintained distribution.
-def nativeTargets = [
-        'librustmi_linux_x86.so'     : [target: 'x86_64-unknown-linux-gnu.2.17', dir: 'x86_64-unknown-linux-gnu', file: 'librustmi.so'],
-        'librustmi_linux_arm64.so'   : [target: 'aarch64-unknown-linux-gnu.2.17', dir: 'aarch64-unknown-linux-gnu', file: 'librustmi.so'],
-        'rustmi_windows_x86.dll'     : [target: 'x86_64-pc-windows-gnu', dir: 'x86_64-pc-windows-gnu', file: 'rustmi.dll'],
-        'rustmi_windows_arm64.dll'   : [target: 'aarch64-pc-windows-gnullvm', dir: 'aarch64-pc-windows-gnullvm', file: 'rustmi.dll'],
-        'librustmi_mac_x86.dylib'    : [target: 'x86_64-apple-darwin', dir: 'x86_64-apple-darwin', file: 'librustmi.dylib'],
-        'librustmi_mac_arm64.dylib'  : [target: 'aarch64-apple-darwin', dir: 'aarch64-apple-darwin', file: 'librustmi.dylib'],
+// Jars in libs/ are pinned by SHA-256 (see AGENTS.md for how to update them).
+def vendoredLibraries = [
+        // Nalim 1.2.1-patched-autoinline, built from ../nalim (one.nalim.*).
+        [file: file('libs/nalim.jar'),
+         sha256: '069ca95d85681156de69c105ed4eb08366bb92017fb619a58eb8fc8d743651bb'],
+        // Fabrolia classes Rustmi compiles against; Fabrolia stays an optional runtime mod.
+        [file: file('libs/fabrolia-compile.jar'),
+         sha256: '747d295cd698c266d8490af5c3da0b3a0902188de877f96b0e20ee341eb1856e']
 ]
 
-// Cross-compiles all six libraries on one machine with cargo-zigbuild. Needs the rustup
-// targets above and zig 0.14.x (0.16 cannot link macOS dylibs) — on PATH, or set ZIG to
-// the zig binary.
-def zigBinary = System.getenv('ZIG')
-def crossTasks = nativeTargets.collect { packaged, spec ->
-    tasks.register("cargo_${spec.dir.replace('-', '_')}", Exec) {
-        inputs.dir('native/src')
-        inputs.files('native/Cargo.toml', 'native/Cargo.lock', 'native/build.rs')
-        outputs.file("native/target/${spec.dir}/release/${spec.file}")
-        workingDir 'native'
-        if (zigBinary != null && !zigBinary.isBlank()) {
-            environment 'PATH', new File(zigBinary).parentFile.absolutePath + File.pathSeparator + System.getenv('PATH')
-        }
-        // zig cc turns mimalloc's __DATE__ use into an error; the date is cosmetic there.
-        environment "CFLAGS_${spec.dir.replace('-', '_')}", '-Wno-error=date-time -Wno-date-time'
-        // Rust's own minimum for Apple Silicon; zig would otherwise stamp its host default.
-        environment 'MACOSX_DEPLOYMENT_TARGET', '11.0'
-        commandLine 'cargo', 'zigbuild', '--release', '--locked', '--target', spec.target
-    }
-}
-
-tasks.register('crossNatives') {
-    // The freshly built libraries are inputs, so a Rust change always re-copies them.
-    inputs.files(crossTasks)
-    outputs.files(nativeTargets.keySet().collect { file(it) })
+tasks.register('verifyVendoredLibraries') {
+    inputs.files(vendoredLibraries.collect { it.file })
 
     doLast {
-        nativeTargets.each { packaged, spec ->
-            def built = file("native/target/${spec.dir}/release/${spec.file}")
-            if (!built.isFile()) {
-                throw new GradleException("cargo zigbuild did not produce ${built}")
+        vendoredLibraries.each { library ->
+            if (!library.file.isFile()) {
+                throw new GradleException("Missing vendored library: ${library.file}")
             }
-            copy {
-                from built
-                into projectDir
-                rename { packaged }
+            def actual = java.security.MessageDigest.getInstance('SHA-256')
+                    .digest(library.file.bytes).encodeHex().toString()
+            if (actual != library.sha256) {
+                throw new GradleException(
+                        "SHA-256 mismatch for ${library.file.name}: expected ${library.sha256}, got ${actual}")
             }
         }
     }
 }
 
-tasks.register('moveBinaries') {
-    mustRunAfter tasks.named('crossNatives')
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    doLast {
-        def resourceDir = file('rustmi/src/main/resources')
-        resourceDir.mkdirs()
-        def missing = nativeTargets.keySet().findAll { !file(it).isFile() }
-        if (!missing.isEmpty()) {
-            throw new GradleException("Missing native libraries ${missing}; run compileLocally " +
-                    "(cargo-zigbuild) or place the CI artifacts in the project root. " +
-                    "Refusing to package a jar that would fail on those platforms.")
-        }
-        nativeTargets.keySet().each { fileName ->
-            copy {
-                from file(fileName)
-                into resourceDir
-            }
-        }
-        println "Copied ${nativeTargets.size()} native libraries to ${resourceDir}"
+    include(implementation 'com.github.Tater-Certified:MixinConstraints:4856759a06')
+    include(implementation(annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-fabric:0.3.3")))
+    // Nalim ships its own fabric.mod.json, so Fabric loads the nested jar as a library mod.
+    include(implementation(group: '', name: 'nalim', version: '1.2.1-patched-autoinline', ext: 'jar'))
+    compileOnly files('libs/fabrolia-compile.jar')
+}
+
+loom {
+    accessWidenerPath = file('src/main/resources/rustmi.accesswidener')
+}
+
+apply from: 'gradle/native-bindings.gradle'
+apply from: 'gradle/natives.gradle'
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn tasks.named('verifyVendoredLibraries')
+    dependsOn tasks.named('generateNativeBindings')
+    options.encoding = 'UTF-8'
+    // Main stays at --release 17 to match the mixins' compatibilityLevel (JAVA_17); only
+    // the generated FFM bindings need Java 25 (java.lang.foreign). The mod requires Java 25.
+    options.release.set(name == 'compileFfmJava' ? 25 : 17)
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'minecraft_version', project.minecraft_version
+    filteringCharset 'UTF-8'
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version, 'minecraft_version': project.minecraft_version
     }
 }
 
-tasks.register('hashLib') {
-    dependsOn tasks.named('moveBinaries')
+java {
+    withSourcesJar()
+}
 
-    doLast {
-        nativeTargets.keySet().each { fileName ->
-            def f = file("rustmi/src/main/resources/${fileName}")
-            if (!f.isFile()) {
-                throw new GradleException("Missing packaged native library ${f}")
-            }
-            def baseName = fileName.substring(0, fileName.lastIndexOf('.'))
-            file("rustmi/src/main/resources/${baseName}.hash").text = sha256Hex(f)
-        }
+jar {
+    from(sourceSets.ffm.output)
+    from('LICENSE.txt', 'LICENSE-GPL-3.0.txt')
+}
+
+tasks.named('sourcesJar') {
+    dependsOn tasks.named('generateNativeBindings')
+    from(sourceSets.ffm.allSource)
+}
+
+// - - - - Tests: plain Java mains (no test framework), all wired into `check` - - - - \\
+
+def mainTest = { String taskName, String testClass, String what, List<String> mainArgs = [] ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        description = what
+        dependsOn tasks.named('testClasses')
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass.set(testClass)
+        args mainArgs
     }
+    tasks.named('check') { dependsOn taskName }
 }
 
-tasks.register('compileLocally') {
-    dependsOn tasks.named('crossNatives')
-    dependsOn tasks.named('generateSatelliteResources')
-    dependsOn project(':nalim').tasks.named('build')
+mainTest('nativeBindingsContractTest', 'com.github.tatercertified.nalim.rust.NativeBindingsContractTest',
+        'Checks NalimBindings, the generated facade and FFM bindings against native/lib.h.',
+        [file('native/lib.h').absolutePath])
+mainTest('activeRegionBatchesTest', 'com.github.tatercertified.nalim.cramming.ActiveRegionBatchesTest',
+        'Checks exact-id regional batch routing and JMM publication.')
+mainTest('regionalCrammingGeometryTest', 'com.github.tatercertified.nalim.cramming.RegionalCrammingGeometryTest',
+        'Checks regional cramming halo coverage boundaries.')
+mainTest('collisionCompatibilityTest', 'com.github.tatercertified.nalim.collision.CollisionCompatibilityTest',
+        'Checks collision fallback precision and mover-predicate gates.')
+mainTest('explosionSeenClipTest', 'com.github.tatercertified.nalim.explosion.ExplosionSeenClipTest',
+        'Checks full-cube exposure rays against Minecraft shape clipping.')
+
+tasks.named('test') {
+    failOnNoDiscoveredTests = false
 }
 
-// The nalim project is the single distributed mod: it embeds the base mod, every native
-// library and both native backends (Nalim/JVMCI, FFM), choosing one at startup.
-def satelliteResources = [
-        [satellite: project(':nalim'), mixinConfig: 'rustmi_nalim.mixins.json',
-         accessWidener: 'rustmi_nalim.accesswidener',
-         breaks: ['rustmi_nalim', 'rustmi_panama', 'rustmi_membrane']]
-]
-satelliteResources.each { target ->
-    target.outputDir = layout.buildDirectory.dir(
-            "generated/satelliteResources/${target.satellite.name}")
+// Rust unit and fixture tests (native/src, fixtures/).
+tasks.register('cargoTest', Exec) {
+    group = 'verification'
+    description = 'Runs cargo test for native/.'
+    workingDir 'native'
+    commandLine 'cargo', 'test', '--release', '--locked'
 }
-
-tasks.register("generateSatelliteResources") {
-    dependsOn tasks.named('hashLib')
-    def sourceDir = file("rustmi/src/main/resources")
-    def sourceAssets = new File(sourceDir, "assets")
-    def sourceJson = new File(sourceDir, "fabric.mod.json")
-
-    inputs.dir(sourceAssets)
-    inputs.file(sourceJson)
-    outputs.dirs(satelliteResources.collect { it.outputDir })
-
-    doLast {
-        if (!sourceJson.isFile()) {
-            throw new GradleException("Missing base metadata: ${sourceJson}")
-        }
-
-        satelliteResources.each { target ->
-            def targetDir = target.outputDir.get().asFile
-            delete targetDir
-            targetDir.mkdirs()
-
-            copy {
-                from sourceAssets
-                into new File(targetDir, "assets")
-            }
-
-            def jsonContent = new JsonSlurper().parse(sourceJson)
-            jsonContent.remove("entrypoints")
-            if (target.mixinConfig == null) {
-                jsonContent.remove("mixins")
-            } else if (jsonContent.mixins instanceof List) {
-                jsonContent.mixins = jsonContent.mixins.collect { mixin ->
-                    mixin == "rustmi.mixins.json" ? target.mixinConfig : mixin
-                }
-            }
-            jsonContent.remove("custom")
-            if (target.accessWidener != null) {
-                jsonContent.accessWidener = target.accessWidener
-            }
-            if (target.breaks != null) {
-                // The former per-backend jars ship the same packages and mixins.
-                jsonContent.breaks = target.breaks.collectEntries { [(it): '*'] }
-            }
-
-            def targetJson = new File(targetDir, "fabric.mod.json")
-            targetJson.text = JsonOutput.prettyPrint(JsonOutput.toJson(jsonContent))
-            println "Generated satellite resources for ${target.satellite.path} in ${targetDir}"
-        }
-    }
-}
-
-
-// - - - - Task Configuration - - - - \\
-
-project(':rustmi').tasks.named('processResources').configure {
-    dependsOn rootProject.tasks.named('hashLib')
-}
-
-satelliteResources.each { target ->
-    target.satellite.sourceSets.main.resources.srcDir(target.outputDir)
-    target.satellite.tasks.named('processResources').configure {
-        dependsOn rootProject.tasks.named('generateSatelliteResources')
-    }
-    target.satellite.tasks.withType(Jar).configureEach {
-        if (name == 'sourcesJar') {
-            dependsOn rootProject.tasks.named('generateSatelliteResources')
-        }
-    }
-}
+tasks.named('check') { dependsOn 'cargoTest' }
