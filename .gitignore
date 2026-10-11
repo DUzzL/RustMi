@@ -1,6 +1,7 @@
 # Build outputs
 .gradle/
 build/
+/bin/
 /native/target/
 *.so
 *.dll
@@ -16,6 +17,7 @@ build/
 /release/
 
 # IDE / tooling
+.DS_Store
 /.idea/
 /.vs/
 *.iml
