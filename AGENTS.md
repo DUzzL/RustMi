@@ -129,9 +129,10 @@ toggles features on a crowd workload for A/B timing.
 
 ## Git
 
-Branch `main`; tag `prod/current` = the commit of the jar in `release/`. The only remote,
-`upstream`, is the original project (Tater-Certified/Oxidizium) with pushing disabled; this
-fork has never been pushed there.
+Branch `main`; tag `prod/current` = the commit of the jar in `release/`. Remote `origin`
+is this fork (DUzzL/RustMi), and `main` tracks `origin/main`. Remote `upstream` is the
+original project (Tater-Certified/Oxidizium) with pushing disabled; this fork has never
+been pushed there.
 
 ## Known open items
 
