@@ -678,6 +678,7 @@ public final class ExplosionEngine {
         if (!c.active) {
             return null;
         }
+        boolean drawn = false;
         try {
             c.qualified = qualify(c);
             if (!c.qualified || !buildSnapshot(c)) {
@@ -689,6 +690,7 @@ public final class ExplosionEngine {
             Bufs b = BUFS.get();
             var u = RustmiCramming.theUnsafe();
             drawFloats(c, u, b.floatsAddr, null);
+            drawn = true;
             int kernelSkip = c.skipAir != 0 ? 1 : 0;
             int count = runKernel(c, b, kernelSkip);
             TAKEOVERS.incrementAndGet();
@@ -703,19 +705,36 @@ public final class ExplosionEngine {
                 discovery = readTriples(u, b.outAddr, count);
             } else {
                 // committed — exact Java port with the same floats
-                JAVA_FALLBACKS.incrementAndGet();
-                float[] floats = new float[RAYS];
-                for (int i = 0; i < RAYS; i++) {
-                    floats[i] = u.getFloat(b.floatsAddr + (long) i * 4);
-                }
-                discovery = javaSweep(c, b, floats);
+                return committedJavaSweep(c);
             }
             return rebuildVanillaList(applySkipAir(c, b, discovery, true));
         } catch (Throwable t) {
             engine = false;
             LOGGER.error("[explosion-engine] takeover failed — engine disabled for this session", t);
-            return null;
+            if (!drawn) {
+                return null;
+            }
+            // The world RNG already advanced by the 1352 draws: running vanilla now would
+            // draw them a second time. Finish with the exact Java port on the same floats.
+            try {
+                return committedJavaSweep(c);
+            } catch (Throwable t2) {
+                LOGGER.error("[explosion-engine] Java port failed after the RNG draws; vanilla redraws", t2);
+                return null;
+            }
         }
+    }
+
+    /** Post-commitment path: the exact Java port over the snapshot with the floats already drawn. */
+    private static List<BlockPos> committedJavaSweep(Ctx c) {
+        JAVA_FALLBACKS.incrementAndGet();
+        Bufs b = BUFS.get();
+        var u = RustmiCramming.theUnsafe();
+        float[] floats = new float[RAYS];
+        for (int i = 0; i < RAYS; i++) {
+            floats[i] = u.getFloat(b.floatsAddr + (long) i * 4);
+        }
+        return rebuildVanillaList(applySkipAir(c, b, javaSweep(c, b, floats), true));
     }
 
     /** Shadow path step 1: arm the float capture before vanilla runs. */
