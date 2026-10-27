@@ -49,7 +49,7 @@ Each has a vanilla fallback per call: when a precondition is not proven, vanilla
   world border, entity colliders, sub-epsilon motion, experimental minecart context → vanilla.
 - Check: `/rustmi collisionshadow on` (runs vanilla too, counts `bad`); fixtures in
   `fixtures/collision/` (cargo tests); `CollisionCompatibilityTest`.
-- Toggles: `config/rustmi-runtime/collision-{engine,shadow}.flag`.
+- Toggles: `config/rustmi-runtime/collision-engine.flag` (shadow modes are not persisted).
 
 ### Cramming and sensors (`LivingEntity.pushEntities`, nearest-living sensor)
 - Entry: `N/mixin/MinecraftServerTickMixin` (tick head → `CrammingHooks.onTickStart`),
@@ -80,15 +80,16 @@ Each has a vanilla fallback per call: when a precondition is not proven, vanilla
 - Java: `N/explosion/ExplosionEngine`. Rust: `rs/explosion/` (`oxi_explosion_sweep_packed`).
 - Rules: Java draws the 1352 `nextFloat`s in vanilla's order and passes them in, so the
   world RNG stays in step for the shuffle and fire rolls; Rust returns positions in
-  discovery order and Java re-inserts them into a real `HashSet` (vanilla iteration order
-  without modelling it); explosions in one tick see each other's craters, so no batching
+  discovery order and Java rebuilds the list the server without Rustmi would build: a real
+  `HashSet<BlockPos>`, or Lithium's `LongOpenHashSet(0)` when Lithium's block_raycast handles
+  the explosion; explosions in one tick see each other's craters, so no batching
   across explosions; takeover only for the vanilla damage calculator or an entity-based one whose entity class
   does not override the block-resistance/explode hooks; after
   the floats are drawn a kernel failure runs the exact Java port with the same floats.
-- Check: `/rustmi explosion shadow on` (turns the engine off; `orderOnly` under Lithium is
-  expected — Lithium iterates its own set); `ExplosionSeenClipTest`.
+- Check: `/rustmi explosion shadow on` (turns the engine off until `shadow off`, which
+  restores it; any `orderOnly` is a failure); `ExplosionSeenClipTest`.
 - E2 seen-percent (`/rustmi explosion seenfast`) is off: its shadow showed mismatches.
-- Toggles: `config/rustmi/explosion-{engine,shadow,seen-fast}.properties`.
+- Toggles: `config/rustmi/explosion-{engine,seen-fast}.properties` (shadow is not persisted).
 
 ### Redstone wire (R3 cascade takeover)
 - Entry: `N/mixin/DefaultRedstoneEvaluatorMixin`, `CollectingNeighborUpdaterMixin`,
