@@ -58,13 +58,20 @@ public abstract class EntityCrammingTrackMixin implements CrammingTracked {
         if (!CrammingEscapes.tracking()) {
             return;
         }
-        if (levelCallback == EntityInLevelCallback.NULL) {
-            // Not in a level yet (constructor, NBT load, a spawn attempt that may be
-            // discarded): no vanilla query can see it. It is registered when it joins an
-            // entity section (EntitySectionSeqMixin), and every later move comes back here.
-            return;
-        }
         int t = CrammingEscapes.tick();
+        if (levelCallback == EntityInLevelCallback.NULL) {
+            // Not in a level (constructor, NBT load, a spawn attempt that may be discarded,
+            // a player between two dimensions): no vanilla query can see it. It is registered
+            // when it joins an entity section (EntitySectionSeqMixin). A snapshot taken earlier
+            // this tick, e.g. in the dimension a player just left, no longer describes it:
+            // forget it so that registration happens.
+            for (;;) {
+                long s = rustmi$state;
+                if ((s >> 2) != t || RUSTMI$STATE.compareAndSet(this, s, 0L)) {
+                    return;
+                }
+            }
+        }
         long s = rustmi$state;
         if ((s >> 2) == t) {
             long flags = s & 3;
