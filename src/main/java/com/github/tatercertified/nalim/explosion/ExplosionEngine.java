@@ -218,13 +218,33 @@ public final class ExplosionEngine {
         long s = -1L, a = -1L;
         try {
             var u = RustmiCramming.theUnsafe();
-            s = u.objectFieldOffset(net.minecraft.world.level.ServerExplosion.class.getDeclaredField("skipAirBlocks"));
-            a = u.objectFieldOffset(net.minecraft.world.level.ServerExplosion.class.getDeclaredField("explodedAirPositions"));
+            var skip = net.minecraft.world.level.ServerExplosion.class.getDeclaredField("skipAirBlocks");
+            var airs = net.minecraft.world.level.ServerExplosion.class.getDeclaredField("explodedAirPositions");
+            // Unsafe accesses below assume these exact types; a renamed or retyped Lithium
+            // field leaves both offsets at -1 (qualify then declines Lithium explosions).
+            if (skip.getType() == byte.class && airs.getType().isAssignableFrom(LongOpenHashSet.class)) {
+                s = u.objectFieldOffset(skip);
+                a = u.objectFieldOffset(airs);
+            }
         } catch (Throwable ignored) {
             // Lithium absent or restructured — mirror off, pure vanilla lists.
         }
         SKIP_AIR_OFFSET = s;
         AIR_SET_OFFSET = a;
+    }
+
+    /** The calculator's own entity: the sweep asks it, not the explosion's source. */
+    private static final long CALC_SOURCE_OFFSET;
+
+    static {
+        long o = -1L;
+        try {
+            o = RustmiCramming.theUnsafe().objectFieldOffset(
+                    EntityBasedExplosionDamageCalculator.class.getDeclaredField("source"));
+        } catch (Throwable ignored) {
+            // field renamed: entity-based calculators are declined
+        }
+        CALC_SOURCE_OFFSET = o;
     }
 
     private static byte readSkipAir(Ctx c) {
@@ -411,13 +431,21 @@ public final class ExplosionEngine {
             lastDisqualify = "radius=" + c.radius;
             return false;
         }
+        if (LITHIUM_EXPLOSION != null && LITHIUM_EXPLOSION.isInstance(c.explosion) && SKIP_AIR_OFFSET < 0) {
+            // Lithium handles this explosion but its skip-air fields could not be mirrored.
+            lastDisqualify = "lithium mirror";
+            return false;
+        }
         Class<?> cc = c.calc.getClass();
         if (cc == ExplosionDamageCalculator.class) {
             return true;
         }
         if (cc == EntityBasedExplosionDamageCalculator.class) {
-            boolean ok = c.source != null && entitySafe(c.source.getClass());
-            if (!ok) lastDisqualify = "entity=" + (c.source == null ? "null" : c.source.getType().toShortString());
+            Object calcSource = CALC_SOURCE_OFFSET < 0 ? null
+                    : RustmiCramming.theUnsafe().getObject(c.calc, CALC_SOURCE_OFFSET);
+            boolean ok = calcSource instanceof Entity e && entitySafe(e.getClass());
+            if (!ok) lastDisqualify = "entity=" + (calcSource instanceof Entity e
+                    ? e.getType().toShortString() : String.valueOf(calcSource));
             return ok;
         }
         lastDisqualify = "calculator=" + cc.getSimpleName();

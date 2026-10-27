@@ -82,7 +82,8 @@ Each has a vanilla fallback per call: when a precondition is not proven, vanilla
   world RNG stays in step for the shuffle and fire rolls; Rust returns positions in
   discovery order and Java re-inserts them into a real `HashSet` (vanilla iteration order
   without modelling it); explosions in one tick see each other's craters, so no batching
-  across explosions; takeover only for the vanilla damage calculators (TNT, creeper); after
+  across explosions; takeover only for the vanilla damage calculator or an entity-based one whose entity class
+  does not override the block-resistance/explode hooks; after
   the floats are drawn a kernel failure runs the exact Java port with the same floats.
 - Check: `/rustmi explosion shadow on` (turns the engine off; `orderOnly` under Lithium is
   expected — Lithium iterates its own set); `ExplosionSeenClipTest`.
