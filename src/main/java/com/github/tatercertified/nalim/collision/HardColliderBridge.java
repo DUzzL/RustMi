@@ -40,7 +40,12 @@ public final class HardColliderBridge {
     /** True when entity colliders might intersect — caller must then run the
      *  precise vanilla query. False is a hard guarantee of emptiness. */
     public static boolean mayHaveEntityColliders(Entity self, AABB box) {
-        return hasCustomCollisionPredicate(self.getClass())
-                || HardColliders.anyNear(self.level(), self, box);
+        try {
+            return hasCustomCollisionPredicate(self.getClass())
+                    || HardColliders.anyNear(self.level(), self, box);
+        } catch (Throwable t) {
+            CollisionEngine.fault("HardColliders", t);
+            return true;   // "maybe": the caller runs vanilla's exact query
+        }
     }
 }

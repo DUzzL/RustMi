@@ -38,6 +38,16 @@ public final class SupportingBlock {
     /** @return the vanilla result, or null when the caller must run vanilla itself. */
     @SuppressWarnings("OptionalAssignedToNull")
     public static Optional<BlockPos> find(Level level, Entity source, AABB box) {
+        try {
+            return findImpl(level, source, box);
+        } catch (Throwable t) {
+            CollisionEngine.fault("SupportingBlock", t);
+            return null;
+        }
+    }
+
+    @SuppressWarnings("OptionalAssignedToNull")
+    private static Optional<BlockPos> findImpl(Level level, Entity source, AABB box) {
         if (level.isClientSide()
                 || (source instanceof AbstractMinecart && AbstractMinecart.useExperimentalMovement(level))) {
             return null;   // MinecartCollisionContext ignores cells the mirror would report

@@ -86,7 +86,15 @@ public abstract class LevelChunkMirrorMixin implements CubeMirror {
                 return built;
             }
             LevelChunkSection sec = ((ChunkAccess) (Object) this).getSections()[idx];
-            long[] bits = oxi$scan(sec);
+            long[] bits;
+            try {
+                bits = oxi$scan(sec);
+            } catch (RuntimeException e) {
+                // A palette read racing a writer (e.g. a missing palette entry during a resize):
+                // treat the section as unknown for this read only and rescan next time. Not null:
+                // that means "outside the build height" and SupportingBlock would read it as air.
+                return Snapshots.ALL_PARTIAL;
+            }
             OXI$SLOT.setRelease(slots, idx, bits);
             return bits;
         }
@@ -158,8 +166,15 @@ public abstract class LevelChunkMirrorMixin implements CubeMirror {
             // cell (TNT primed in onPlace, lava → cobblestone inside spreadTo) complete their
             // hooks inner-first, so the outer hook's argument is already superseded.
             LevelChunkSection sec = ((ChunkAccess) (Object) this).getSections()[sectionIdx];
-            BlockState live = sec.getBlockState(cell & 15, cell >>> 8, (cell >>> 4) & 15);
-            int now = oxi$offsetOf(CollisionEngine.classify(live));
+            int now;
+            try {
+                BlockState live = sec.getBlockState(cell & 15, cell >>> 8, (cell >>> 4) & 15);
+                now = oxi$offsetOf(CollisionEngine.classify(live));
+            } catch (RuntimeException e) {
+                // Never throw into LevelChunk.setBlockState: drop the snapshot, the next read rescans.
+                OXI$SLOT.setRelease(slots, sectionIdx, null);
+                return;
+            }
             int word = cell >> 6;
             long bit = 1L << (cell & 63);
             int was = (cur[FULL_OFF + word] & bit) != 0 ? FULL_OFF

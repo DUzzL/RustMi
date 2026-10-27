@@ -355,7 +355,7 @@ public final class CollisionEngine {
         volatile long bailOther;
         volatile long shadowOk;
         volatile long shadowBad;
-        /** bailOther split: precision, cellCap, noChunk, noMirror, solidsCap, gridsCap, kernel, negZero. */
+        /** bailOther split: precision, cellCap, noChunk, noMirror, solidsCap, gridsCap, kernel, negZero, error. */
         final long[] why = new long[WHY.length];
 
         void bail(int reason) {
@@ -371,7 +371,8 @@ public final class CollisionEngine {
     }
 
     private static final String[] WHY = {
-            "precision", "cellCap", "noChunk", "noMirror", "solidsCap", "gridsCap", "kernel", "negZero"};
+            "precision", "cellCap", "noChunk", "noMirror", "solidsCap", "gridsCap", "kernel", "negZero", "error"};
+    private static final int WHY_ERROR = 8;
 
     private static volatile long statsEpoch;
     private static final ConcurrentLinkedQueue<Stats> ALL_STATS = new ConcurrentLinkedQueue<>();
@@ -382,14 +383,33 @@ public final class CollisionEngine {
     });
     private static final ConcurrentLinkedQueue<String> EXAMPLES = new ConcurrentLinkedQueue<>();
 
+    /** Set when Rustmi's own collision code threw: everything runs vanilla until an operator
+     *  switches the engine or the shadow on again. Not persisted. */
+    private static volatile boolean faulted;
+    private static volatile String faultInfo = "";
+
     public static boolean isActive() {
-        return engine || shadow;
+        return !faulted && (engine || shadow);
+    }
+
+    /** Disables the fast paths for this session; the first failure is logged with its stack. */
+    public static void fault(String where, Throwable t) {
+        if (t instanceof VirtualMachineError e) {
+            throw e;
+        }
+        if (!faulted) {
+            faulted = true;
+            faultInfo = where + ": " + t;
+            LOGGER.error("[collision-engine] {} failed; collision fast paths disabled until "
+                    + "`/rustmi collision on`", where, t);
+        }
     }
 
     /** Shadow on turns the engine off for the session only; shadow off restores it. */
     public static synchronized void setShadow(boolean on) {
         if (on) {
             resetStats();
+            faulted = false;
             if (engineAfterShadow == null) {
                 engineAfterShadow = engine;
             }
@@ -405,6 +425,7 @@ public final class CollisionEngine {
         engineAfterShadow = null;
         if (on) {
             resetStats();
+            faulted = false;
             shadow = false;
         }
         engine = on;
@@ -456,6 +477,9 @@ public final class CollisionEngine {
             sb.append(i == 0 ? "" : " ").append(WHY[i]).append('=').append(why[i]);
         }
         sb.append('}');
+        if (faulted) {
+            sb.append(" | faulted=").append(faultInfo);
+        }
         if (!EXAMPLES.isEmpty()) {
             sb.append(" | ").append(String.join("; ", EXAMPLES));
         }
@@ -534,6 +558,18 @@ public final class CollisionEngine {
     public static Vec3 tryCollide(Entity entity, Vec3 movement, AABB box, float step) {
         Stats stats = currentStats();
         stats.calls++;
+        try {
+            return collideFast(stats, entity, movement, box, step);
+        } catch (Throwable t) {
+            // The native call is the last step and keeps no state, so nothing is half done:
+            // this call and every later one run vanilla.
+            stats.bail(WHY_ERROR);
+            fault("tryCollide", t);
+            return null;
+        }
+    }
+
+    private static Vec3 collideFast(Stats stats, Entity entity, Vec3 movement, AABB box, float step) {
         if (requiresVanillaPrecision(movement)) {   // callers gate earlier; kept as the contract
             stats.bail(hasSubEpsilon(movement) ? 0 : 7);
             return null;
@@ -737,11 +773,21 @@ public final class CollisionEngine {
             stats.bail(6);
             return null;
         }
+        Vec3 result = new Vec3(u.getDouble(b.outAddr), u.getDouble(b.outAddr + 8), u.getDouble(b.outAddr + 16));
         stats.fast++;
-        return new Vec3(u.getDouble(b.outAddr), u.getDouble(b.outAddr + 8), u.getDouble(b.outAddr + 16));
+        return result;
     }
 
+    /** Never throws: the caller returns vanilla's result after this. */
     public static void recordShadow(Vec3 vanilla, Vec3 fast, Entity entity, Vec3 movement) {
+        try {
+            compareShadow(vanilla, fast, entity, movement);
+        } catch (Throwable t) {
+            fault("recordShadow", t);
+        }
+    }
+
+    private static void compareShadow(Vec3 vanilla, Vec3 fast, Entity entity, Vec3 movement) {
         // Raw bits: the result must be vanilla's exact vector, signed zeros included
         // (-0.0 inputs go to vanilla, see requiresVanillaPrecision).
         Stats stats = currentStats();
@@ -787,6 +833,15 @@ public final class CollisionEngine {
     /** Collision-shadow comparison for {@link SupportingBlock} (same ok/bad counters). */
     public static void recordSupportShadow(java.util.Optional<BlockPos> vanilla, java.util.Optional<BlockPos> fast,
                                            Entity entity) {
+        try {
+            compareSupportShadow(vanilla, fast, entity);
+        } catch (Throwable t) {
+            fault("recordSupportShadow", t);
+        }
+    }
+
+    private static void compareSupportShadow(java.util.Optional<BlockPos> vanilla, java.util.Optional<BlockPos> fast,
+                                             Entity entity) {
         Stats stats = currentStats();
         if (vanilla.equals(fast)) {
             stats.shadowOk++;
