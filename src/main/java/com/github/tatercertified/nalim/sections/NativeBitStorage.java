@@ -140,11 +140,6 @@ public final class NativeBitStorage implements BitStorage {
         }
     }
 
-    /** Native address of word 0 — the Rust kernels' view of this storage. */
-    public long address() {
-        return addr;
-    }
-
     public int words() {
         return words;
     }

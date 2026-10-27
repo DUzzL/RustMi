@@ -6,9 +6,8 @@
 //
 //   * Java reads/writes through Unsafe address arithmetic (NativeBitStorage)
 //     — same cost as an array access, no per-block FFI;
-//   * the GC stops scanning/copying gigabytes of long[] (old-gen pause win);
-//   * Rust kernels receive (addr, bits, size) and read the same memory
-//     directly — zero-copy world inspection for future engines.
+//   * the GC stops scanning/copying gigabytes of long[] (old-gen pause win).
+//   No Rust kernel reads these blocks today; they are only allocated and freed here.
 //
 // Allocation strategy: straight Rust global alloc with 64-byte alignment
 // (cache-line; SIMD-friendly for future kernels). Section word counts are a
@@ -17,8 +16,8 @@
 // overflow frees go straight to the global allocator.
 //
 // Threading: chunk load/unload happens on multiple threads (c2me chunk
-// system + main). Pools are striped behind a small spinlock per size class
-// — hold times are a few instructions.
+// system + main). Each size class has its own pool behind a parking_lot mutex
+// — hold times are a few instructions (blocks are zeroed outside the lock).
 
 use parking_lot::Mutex;
 use std::alloc::{alloc_zeroed, dealloc, Layout};
