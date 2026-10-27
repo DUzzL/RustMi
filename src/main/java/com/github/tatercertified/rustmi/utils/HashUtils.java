@@ -28,7 +28,11 @@ public final class HashUtils {
             }
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-                return reader.readLine();
+                String hash = reader.readLine();
+                if (hash == null || hash.isBlank()) {
+                    throw new IOException("empty hash file");
+                }
+                return hash.trim();
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to read " + binaryName + ".hash", e);

@@ -64,7 +64,9 @@ public class LoadRustBinary {
     private static void requireGlibc() {
         try {
             // The libc this JVM itself runs on is the one dlopen will resolve against.
-            for (String line : Files.readAllLines(Paths.get("/proc/self/maps"))) {
+            // ISO-8859-1 reads every byte: a non-UTF-8 mapped path must not skip the check.
+            for (String line : Files.readAllLines(Paths.get("/proc/self/maps"),
+                    java.nio.charset.StandardCharsets.ISO_8859_1)) {
                 if (line.contains("ld-musl-")) {
                     throw new IllegalStateException("RustMI needs a glibc-based JVM; this one runs on musl "
                             + "(e.g. Alpine). Use a glibc image or JDK build");
@@ -95,7 +97,28 @@ public class LoadRustBinary {
             Path destinationPath = getLibrariesDir().resolve(outputName + "." + extension);
 
             if (Files.notExists(destinationPath) || !HashUtils.checkHash(destinationPath, binaryNameNoExt)) {
-                Files.copy(inputStream, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+                // Write a private temp file, verify it, then rename it into place: a second
+                // server starting in the same directory never sees (or loads) a half-written
+                // library, and a crash mid-copy leaves no truncated one behind.
+                Path tmp = Files.createTempFile(destinationPath.getParent(), outputName, ".part");
+                try {
+                    Files.copy(inputStream, tmp, StandardCopyOption.REPLACE_EXISTING);
+                    if (!HashUtils.checkHash(tmp, binaryNameNoExt)) {
+                        throw new IOException("extracted " + binaryName + " does not match its bundled SHA-256");
+                    }
+                    try {
+                        Files.move(tmp, destinationPath, StandardCopyOption.ATOMIC_MOVE,
+                                StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        // E.g. Windows refusing to replace a library another process has loaded:
+                        // fine if that file is already this build's library.
+                        if (!HashUtils.checkHash(destinationPath, binaryNameNoExt)) {
+                            throw e;
+                        }
+                    }
+                } finally {
+                    Files.deleteIfExists(tmp);
+                }
             }
 
             // Both backends load the library by this absolute path: Nalim through
