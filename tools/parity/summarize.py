@@ -51,6 +51,10 @@ def main():
             fails[f"{cfg}_run_error"] = 50
             asi[f"{cfg}_error"] = r["error"][:200]
         fails[f"{cfg}_log_errors"] = len(r.get("log_errors", []))
+        # A crash on the way out (e.g. a native fault at shutdown) only shows in the exit code.
+        if r.get("exit_code") != 0:
+            fails[f"{cfg}_exit_code"] = 50
+            asi[f"{cfg}_exit_code"] = r.get("exit_code")
         # The run must have used the backend it forced (-Drustmi.backend=<backend>).
         if (r.get("backend") or "").lower() != backend:
             fails[f"{cfg}_wrong_backend"] = 50
