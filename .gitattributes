@@ -1,0 +1,5 @@
+# Scripts must stay LF on every checkout (bash/python cannot run CRLF files).
+*.sh    text eol=lf
+*.py    text eol=lf
+gradlew text eol=lf
+*.bat   text eol=crlf
