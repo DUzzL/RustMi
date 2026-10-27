@@ -85,6 +85,8 @@ final class NetworkCache {
         /** Repeat cascades of a stationary machine: same trigger + same value
          *  state ⇒ same event script. Bounded; cleared wholesale when full. */
         final Map<ScriptKey, int[]> scripts = new HashMap<>(8);
+        /** Bytes of {@link #scripts}, part of SCRIPT_BYTES. */
+        long scriptBytes;
         final int x0, y0, z0, x1, y1, z1;   // halo bounds (+2)
         /** Chunk columns this entry is registered under; null = {@code wide}. */
         final long[] columns;
@@ -138,6 +140,16 @@ final class NetworkCache {
     private static final java.util.concurrent.ConcurrentLinkedQueue<PendingSetBlock> OFF_MAIN_EVENTS =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
     private static volatile int ALL_COUNT;
+    /** Queued off-main events; past {@link #OFF_MAIN_CAP} new ones are dropped and the next
+     *  main-thread drain clears the whole cache instead (a cache miss only costs a walk). */
+    private static final java.util.concurrent.atomic.AtomicInteger OFF_MAIN_PENDING =
+            new java.util.concurrent.atomic.AtomicInteger();
+    private static final int OFF_MAIN_CAP = 65_536;
+    private static volatile boolean offMainOverflow;
+    /** Bytes held by cached scripts across all networks (count caps alone allowed gigabytes). */
+    private static final java.util.concurrent.atomic.AtomicLong SCRIPT_BYTES =
+            new java.util.concurrent.atomic.AtomicLong();
+    private static final long SCRIPT_BYTES_BUDGET = 64L << 20;
 
     /** {@code vanillaEval}: not a write — vanilla evaluated member wire {@code pos}
      *  ({@link #onVanillaEvaluate}); the state fields are unused. */
@@ -156,9 +168,28 @@ final class NetworkCache {
                 && Thread.currentThread() == ((MinecraftServerThreadAccessor) server).rustmi$serverThread();
     }
 
+    private static void queueOffMain(PendingSetBlock e) {
+        if (OFF_MAIN_PENDING.incrementAndGet() > OFF_MAIN_CAP) {
+            OFF_MAIN_PENDING.decrementAndGet();
+            offMainOverflow = true;
+            return;
+        }
+        OFF_MAIN_EVENTS.add(e);
+    }
+
     private static void drainOffMainEvents() {
+        if (offMainOverflow) {
+            // Events were dropped: no cached entry can be trusted any more.
+            offMainOverflow = false;
+            while (OFF_MAIN_EVENTS.poll() != null) {
+                OFF_MAIN_PENDING.decrementAndGet();
+            }
+            clear();
+            return;
+        }
         PendingSetBlock e;
         while ((e = OFF_MAIN_EVENTS.poll()) != null) {
+            OFF_MAIN_PENDING.decrementAndGet();
             if (e.vanillaEval) {
                 markSpDirty(e.level, e.pos);
             } else {
@@ -232,9 +263,18 @@ final class NetworkCache {
             return;
         }
         if (c.scripts.size() >= MAX_SCRIPTS_PER_NET) {
+            SCRIPT_BYTES.addAndGet(-c.scriptBytes);
+            c.scriptBytes = 0;
             c.scripts.clear();
         }
-        c.scripts.put(key, events);
+        long bytes = events.length * 4L;
+        if (SCRIPT_BYTES.get() + bytes > SCRIPT_BYTES_BUDGET) {
+            return;   // not cached: the next identical cascade simulates again
+        }
+        int[] prev = c.scripts.put(key, events);
+        long delta = bytes - (prev == null ? 0 : prev.length * 4L);
+        c.scriptBytes += delta;
+        SCRIPT_BYTES.addAndGet(delta);
     }
 
     static Cached store(Level level, Map<BlockPos, CascadeRecorder.Node> network) {
@@ -283,7 +323,7 @@ final class NetworkCache {
             // Worker-side write (random tick / island-sliced scheduled tick):
             // buffer for main. pos may be a MutableBlockPos on these paths.
             if (ALL_COUNT > 0) {
-                OFF_MAIN_EVENTS.add(new PendingSetBlock(
+                queueOffMain(new PendingSetBlock(
                         level, pos.immutable(), oldState, newState, wireOnlyPowerChange, newPower, false));
             }
             return;
@@ -326,7 +366,7 @@ final class NetworkCache {
             return;
         }
         if (!onMain(level)) {
-            OFF_MAIN_EVENTS.add(new PendingSetBlock(level, pos.immutable(), null, null, false, 0, true));
+            queueOffMain(new PendingSetBlock(level, pos.immutable(), null, null, false, 0, true));
             return;
         }
         drainOffMainEvents();
@@ -427,6 +467,8 @@ final class NetworkCache {
             return;
         }
         ALL_COUNT = ALL.size();
+        SCRIPT_BYTES.addAndGet(-c.scriptBytes);
+        c.scriptBytes = 0;
         LevelIndex idx = c.index;
         for (BlockPos p : c.network.keySet()) {
             idx.byPos.remove(p, c);
@@ -447,6 +489,7 @@ final class NetworkCache {
         LEVELS.clear();
         ALL.clear();
         ALL_COUNT = 0;
+        SCRIPT_BYTES.set(0);
     }
 
     static int size() {
