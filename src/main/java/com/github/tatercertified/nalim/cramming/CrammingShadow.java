@@ -46,23 +46,43 @@ public final class CrammingShadow {
         enabled = on;
     }
 
+    /** Never throws: the caller goes on with the served list either way. */
     public static void compare(LivingEntity self, List<Entity> served) {
-        // Vanilla's getPushableEntities body, called directly: Lithium redirects that
-        // method and, with Fabrolia, serves it from a concurrent class-group set that
-        // iterates in hash order — not vanilla's section insertion order.
-        List<Entity> vanilla = self.level().getEntities(self, self.getBoundingBox(),
-                net.minecraft.world.entity.EntitySelector.pushableBy(self));
-        CALLS.incrementAndGet();
-        record(self, vanilla, served, SET_MISMATCH, ORDER_MISMATCH, "");
+        try {
+            // Vanilla's getPushableEntities body, called directly: Lithium redirects that
+            // method and, with Fabrolia, serves it from a concurrent class-group set that
+            // iterates in hash order — not vanilla's section insertion order.
+            List<Entity> vanilla = self.level().getEntities(self, self.getBoundingBox(),
+                    net.minecraft.world.entity.EntitySelector.pushableBy(self));
+            CALLS.incrementAndGet();
+            record(self, vanilla, served, SET_MISMATCH, ORDER_MISMATCH, "");
+        } catch (Throwable t) {
+            error(t);
+        }
     }
 
     /** Nearest-living sensor provider (Fabrolia region mode) against the query it replaces. */
     public static void compareSensor(LivingEntity body, net.minecraft.world.phys.AABB box,
                                      List<? extends Entity> served) {
-        List<? extends Entity> vanilla = body.level().getEntitiesOfClass(
-                LivingEntity.class, box, e -> e != body && e.isAlive());
-        SENSOR_CALLS.incrementAndGet();
-        record(body, vanilla, served, SENSOR_SET_MISMATCH, SENSOR_ORDER_MISMATCH, "sensor ");
+        try {
+            List<? extends Entity> vanilla = body.level().getEntitiesOfClass(
+                    LivingEntity.class, box, e -> e != body && e.isAlive());
+            SENSOR_CALLS.incrementAndGet();
+            record(body, vanilla, served, SENSOR_SET_MISMATCH, SENSOR_ORDER_MISMATCH, "sensor ");
+        } catch (Throwable t) {
+            error(t);
+        }
+    }
+
+    private static final AtomicLong ERRORS = new AtomicLong();
+
+    private static void error(Throwable t) {
+        if (t instanceof VirtualMachineError e) {
+            throw e;
+        }
+        if (ERRORS.getAndIncrement() == 0) {
+            org.slf4j.LoggerFactory.getLogger("Rustmi-Cramming").error("[cramming-shadow] compare failed", t);
+        }
     }
 
     private static void record(Entity self, List<? extends Entity> vanilla, List<? extends Entity> served,
@@ -110,7 +130,8 @@ public final class CrammingShadow {
                 .append(" orderMismatch=").append(ORDER_MISMATCH.get())
                 .append(" | sensorCalls=").append(SENSOR_CALLS.get())
                 .append(" sensorSet=").append(SENSOR_SET_MISMATCH.get())
-                .append(" sensorOrder=").append(SENSOR_ORDER_MISMATCH.get());
+                .append(" sensorOrder=").append(SENSOR_ORDER_MISMATCH.get())
+                .append(" errors=").append(ERRORS.get());
         for (String e : EXAMPLES) {
             sb.append(" | ").append(e);
         }
