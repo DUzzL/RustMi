@@ -58,6 +58,12 @@ public abstract class EntityCrammingTrackMixin implements CrammingTracked {
         if (!CrammingEscapes.tracking()) {
             return;
         }
+        if (levelCallback == EntityInLevelCallback.NULL) {
+            // Not in a level yet (constructor, NBT load, a spawn attempt that may be
+            // discarded): no vanilla query can see it. It is registered when it joins an
+            // entity section (EntitySectionSeqMixin), and every later move comes back here.
+            return;
+        }
         int t = CrammingEscapes.tick();
         long s = rustmi$state;
         if ((s >> 2) == t) {
@@ -69,14 +75,24 @@ public abstract class EntityCrammingTrackMixin implements CrammingTracked {
         // Not snapshotted this tick, being snapshotted right now, or drifted out of the
         // snapshot tolerance.
         if (CrammingEscapes.offer((Entity) (Object) this)) {
-            for (;;) {
-                s = rustmi$state;
-                long keep = (s >> 2) == t ? s & RUSTMI$SNAPSHOTTING : 0;
-                if (RUSTMI$STATE.compareAndSet(this, s, ((long) t << 2) | RUSTMI$ESCAPED | keep)) {
-                    return;
-                }
+            rustmi$markEscaped(t);
+        }
+    }
+
+    @Override
+    public void rustmi$markEscaped(int t) {
+        for (;;) {
+            long s = rustmi$state;
+            long keep = (s >> 2) == t ? s & RUSTMI$SNAPSHOTTING : 0;
+            if (RUSTMI$STATE.compareAndSet(this, s, ((long) t << 2) | RUSTMI$ESCAPED | keep)) {
+                return;
             }
         }
+    }
+
+    @Override
+    public boolean rustmi$seen(int tick) {
+        return (rustmi$state >> 2) == tick;
     }
 
     @Unique

@@ -32,6 +32,7 @@ public abstract class EntitySectionSeqMixin<T extends EntityAccess> {
         }
         if (entity instanceof Entity e) {
             HardColliders.onSectionAdd(e);
+            CrammingEscapes.onSectionAdd(e);
         }
     }
 

@@ -89,6 +89,22 @@ public final class CrammingEscapes {
         return true;
     }
 
+    /**
+     * The entity joins an entity section (added to the level, or moved between sections).
+     * Entities are only tracked once they are in a level, so one that was not snapshotted
+     * or registered this tick becomes an escapee here.
+     */
+    public static void onSectionAdd(Entity e) {
+        if (!tracking) {
+            return;
+        }
+        int t = tick;
+        CrammingTracked tracked = (CrammingTracked) e;
+        if (!tracked.rustmi$seen(t) && offer(e)) {
+            tracked.rustmi$markEscaped(t);
+        }
+    }
+
     /** False when this query must not trust the snapshot (origin escaped, or the
      *  escapee table overflowed this tick). */
     public static boolean originReliable(Entity origin) {

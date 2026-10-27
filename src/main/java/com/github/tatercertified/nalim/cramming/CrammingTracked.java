@@ -12,6 +12,12 @@ public interface CrammingTracked {
      *  snapshotted) during {@code tick}. */
     boolean rustmi$escaped(int tick);
 
+    /** True when the entity was snapshotted or registered as an escapee during {@code tick}. */
+    boolean rustmi$seen(int tick);
+
+    /** Records that the entity was registered as an escapee during {@code tick}. */
+    void rustmi$markEscaped(int tick);
+
     /** True once the entity manager owns the entity (vanilla queries can see it). */
     boolean rustmi$inLevel();
 
