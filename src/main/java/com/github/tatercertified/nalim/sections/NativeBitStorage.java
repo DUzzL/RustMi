@@ -36,9 +36,10 @@ import java.util.function.IntConsumer;
  * The Rust side pools the standard section word-counts, so churn is cheap.
  *
  * <p>Resident {@code PalettedContainer.Data} instances are wired through
- * {@code PalettedContainerMixin}; fresh construction, disk unpack, repacks,
- * and native-aware copies all converge on that constructor. Transient
- * serialization scratch storages remain vanilla.
+ * {@code PalettedContainerMixin}; fresh construction, disk unpack and repacks
+ * converge on that constructor. Copies ({@link #copy()}, e.g. the save snapshot
+ * of every section on every chunk save) and transient serialization scratch
+ * storages stay on the heap, like vanilla's.
  */
 public final class NativeBitStorage implements BitStorage {
 
@@ -48,6 +49,9 @@ public final class NativeBitStorage implements BitStorage {
         return t;
     });
     private static final sun.misc.Unsafe U = RustmiCramming.theUnsafe();
+    /** Bytes held by live native storages (allocated minus cleaned). */
+    private static final java.util.concurrent.atomic.AtomicLong LIVE_BYTES =
+            new java.util.concurrent.atomic.AtomicLong();
 
     /** Vanilla MAGIC table, identical layout: (scale, offset, shift) per
      *  valuesPerLong-1. Mirrored via SimpleBitStorage on first use. */
@@ -100,7 +104,16 @@ public final class NativeBitStorage implements BitStorage {
         }
         final long fAddr = a;
         final int fWords = this.words;
-        this.cleanable = CLEANER.register(this, () -> RustmiLib.oxi_section_free(fAddr, fWords));
+        LIVE_BYTES.addAndGet(fWords * 8L);
+        this.cleanable = CLEANER.register(this, () -> {
+            RustmiLib.oxi_section_free(fAddr, fWords);
+            LIVE_BYTES.addAndGet(-fWords * 8L);
+        });
+    }
+
+    /** Native bytes currently held by section storages. */
+    public static long liveBytes() {
+        return LIVE_BYTES.get();
     }
 
     /** Vanilla SimpleBitStorage(int,int,int[]) packing loop, words → native. */
@@ -275,12 +288,14 @@ public final class NativeBitStorage implements BitStorage {
         }
     }
 
+    /**
+     * A heap copy, as vanilla makes it. Copies are mostly short-lived save snapshots of every
+     * section on every chunk save; native ones were freed only by the Cleaner after a GC, so
+     * native memory grew with the save rate instead of with the loaded world.
+     */
     @Override
     public BitStorage copy() {
-        NativeBitStorage c = new NativeBitStorage(bits, size);
-        U.copyMemory(addr, c.addr, (long) words * 8L);
-        Reference.reachabilityFence(this);
-        return c;
+        return new SimpleBitStorage(bits, size, getRaw());
     }
 
     /** Explicit early release (chunk unload fast path, optional). */

@@ -67,6 +67,9 @@ public final class NativeSections {
             long a = RustmiLib.oxi_section_alloc(16);
             if (a != 0) {
                 RustmiLib.oxi_section_free(a, 16);
+                // Initialise NativeBitStorage (MAGIC table, Unsafe, Cleaner) once here, so a
+                // failure latches off with its cause instead of failing every chunk section.
+                new NativeBitStorage(4, 4096).releaseNow();
                 libState = 1;
                 LOGGER.info("[native-sections] allocator probe OK — section storage goes native");
             } else {
@@ -87,15 +90,25 @@ public final class NativeSections {
      */
     public static BitStorage swapToNative(BitStorage storage) {
         if (storage instanceof SimpleBitStorage simple && usable()) {
+            if (NativeBitStorage.liveBytes() >= MAX_NATIVE_BYTES) {
+                // No back-pressure from the GC on native memory: past the ceiling new storages
+                // stay on the heap (identical results), which in turn lets the GC run the Cleaner.
+                return storage;
+            }
             try {
                 return new NativeBitStorage(simple.getBits(), simple.getSize(), simple.getRaw());
-            } catch (OutOfMemoryError oom) {
-                LOGGER.error("[native-sections] native OOM — latching off, staying on heap");
+            } catch (OutOfMemoryError | LinkageError | RuntimeException e) {
+                // Called while a chunk section is constructed: never propagate, stay on heap.
+                LOGGER.error("[native-sections] native storage failed — latching off, staying on heap", e);
                 libState = -1;
             }
         }
         return storage;
     }
+
+    /** {@code -Drustmi.sections.maxMiB}; default a quarter of the maximum heap. */
+    private static final long MAX_NATIVE_BYTES = Long.getLong("rustmi.sections.maxMiB",
+            Math.max(64L, Runtime.getRuntime().maxMemory() / 4L / (1024L * 1024L))) * 1024L * 1024L;
 
     /**
      * True once the allocator probe succeeded. While false no {@link NativeBitStorage} can

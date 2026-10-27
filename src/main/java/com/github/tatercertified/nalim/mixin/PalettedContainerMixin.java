@@ -25,9 +25,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * NativeSections stage 2 — the single coupling point. Every RESIDENT section
  * storage flows through the {@code PalettedContainer$Data} constructor
  * (fresh containers via createOrReuseData, disk loads + repacks via unpack's
- * result container, copies via Data.copy → storage.copy() which is already
- * native-aware); transient storages (serialize/repack temporaries) never reach
- * it. Swapping the BitStorage argument here moves the words off-heap with zero
+ * result container); copies (Data.copy → storage.copy(), e.g. save snapshots)
+ * come back as heap storages and transient serialize/repack temporaries never
+ * reach it. Swapping the BitStorage argument here moves the words off-heap with zero
  * structural change — the heap SimpleBitStorage the caller just built becomes
  * instant eden garbage.
  *
