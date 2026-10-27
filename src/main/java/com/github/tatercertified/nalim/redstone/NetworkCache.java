@@ -296,6 +296,10 @@ final class NetworkCache {
         return ALL_COUNT > 0;
     }
 
+    static boolean isMainThread(Level level) {
+        return onMain(level);
+    }
+
     /**
      * A topology-changing write is about to happen (setBlockState HEAD, before its
      * removal/placement side effects run). Drops the entries it touches right away;

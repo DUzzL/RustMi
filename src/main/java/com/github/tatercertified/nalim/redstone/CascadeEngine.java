@@ -555,13 +555,21 @@ public final class CascadeEngine {
             return;
         }
         Session s = SESSION.get();
-        boolean inSession = s != null && !s.aborted && !s.emittingSet && s.level == level && s.inHalo(pos);
-        if (!inSession && !NetworkCache.hasEntries()) {
+        if (s != null && s.emittingSet) {
+            return;   // the script's own wire POWER sets: same block, never topology
+        }
+        boolean inSession = s != null && !s.aborted && s.level == level && s.inHalo(pos);
+        // Cache drops happen on the main thread only (worker writes reach the cache
+        // through the RETURN sentinel's queue), so a worker outside a session has nothing to do.
+        if (!inSession && !(NetworkCache.hasEntries() && NetworkCache.isMainThread(level))) {
             return;
         }
         BlockState oldState = chunk.getBlockState(pos);
         if (oldState == newState) {
             return;
+        }
+        if (newState.isAir() && chunk.getSection(chunk.getSectionIndex(pos.getY())).hasOnlyAir()) {
+            return;   // vanilla returns before writing (air into an all-air section)
         }
         if (oldState.getBlock() == newState.getBlock()
                 && !NetworkCache.conductorChanged(level, pos, oldState, newState)) {
