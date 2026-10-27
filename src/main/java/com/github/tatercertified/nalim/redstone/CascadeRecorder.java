@@ -357,6 +357,9 @@ public final class CascadeRecorder {
     static Map<BlockPos, Node> walkNetwork(Level level, BlockPos start,
                                            RedstoneWireBlock wire, BlockSignalReader signals,
                                            int maxNodes) {
+        // The start position becomes a map key and a cached node position; callers may
+        // hand in a MutableBlockPos (neighbors are already made immutable in considerEdge).
+        start = start.immutable();
         Map<BlockPos, Node> network = new HashMap<>();
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
         queue.add(start);
