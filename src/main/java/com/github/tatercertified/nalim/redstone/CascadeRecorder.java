@@ -1,6 +1,7 @@
 package com.github.tatercertified.nalim.redstone;
 
 import net.minecraft.core.BlockPos;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.RedstoneWireBlock;
@@ -353,7 +354,10 @@ public final class CascadeRecorder {
     // ─────────────────────────────────────────────────────────────────────
 
     /** Shared by the recorder, the shadow comparator and the R3 engine.
-     *  Returns the closure network, or null when it exceeds {@code maxNodes}. */
+     *  Returns the closure network, or null when it exceeds {@code maxNodes} or would
+     *  read a chunk that is not loaded (or, on a Fabrolia region worker, owned by another
+     *  region): vanilla only reads the 2-block halo of wires it evaluates, so the walk must
+     *  not load or race on chunks a cascade never touches. */
     static Map<BlockPos, Node> walkNetwork(Level level, BlockPos start,
                                            RedstoneWireBlock wire, BlockSignalReader signals,
                                            int maxNodes) {
@@ -365,12 +369,16 @@ public final class CascadeRecorder {
         queue.add(start);
         Set<BlockPos> seen = new HashSet<>();
         seen.add(start);
+        LongOpenHashSet readable = new LongOpenHashSet();
 
         while (!queue.isEmpty()) {
             if (network.size() >= maxNodes) {
                 return null;
             }
             BlockPos p = queue.poll();
+            if (!haloReadable(level, p, readable)) {
+                return null;
+            }
             BlockState state = level.getBlockState(p);
             if (!state.is(wire)) {
                 continue;
@@ -399,6 +407,46 @@ public final class CascadeRecorder {
             }
         }
         return network;
+    }
+
+    /** Every chunk within 2 blocks of {@code p} (the reads of one node, including the
+     *  strong-power probe) is loaded and, on a region worker, in the worker's region. */
+    private static boolean haloReadable(Level level, BlockPos p, LongOpenHashSet readable) {
+        for (int cx = (p.getX() - 2) >> 4; cx <= (p.getX() + 2) >> 4; cx++) {
+            for (int cz = (p.getZ() - 2) >> 4; cz <= (p.getZ() + 2) >> 4; cz++) {
+                long key = ((long) cz << 32) | (cx & 0xFFFFFFFFL);
+                if (readable.contains(key)) {
+                    continue;
+                }
+                if (!level.getChunkSource().hasChunk(cx, cz) || !ownedByThisThread(level, cx, cz)) {
+                    return false;
+                }
+                readable.add(key);
+            }
+        }
+        return true;
+    }
+
+    private static final boolean FABROLIA =
+            net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("fabrolia");
+    private static volatile boolean regionApiBroken;
+
+    private static boolean ownedByThisThread(Level level, int cx, int cz) {
+        if (!FABROLIA) {
+            return true;
+        }
+        if (regionApiBroken) {
+            return false;
+        }
+        try {
+            return FabroliaRegions.ownsChunk(level, cx, cz);
+        } catch (LinkageError e) {
+            // Fabrolia API differs from the one compiled against: no ownership proof, so
+            // every walk bails to vanilla from now on.
+            LOGGER.error("[redstone] Fabrolia region API unavailable; network walks disabled", e);
+            regionApiBroken = true;
+            return false;
+        }
     }
 
     private static void considerEdge(Level level, RedstoneWireBlock wire, Node from,
