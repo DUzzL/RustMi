@@ -543,7 +543,7 @@ public final class CascadeEngine {
      * live world, and stops a running script in its halo from emitting until the
      * RETURN sentinel aborts it.
      */
-    public static void onWorldSetBlockHead(LevelChunk chunk, BlockPos pos, BlockState newState) {
+    public static void onWorldSetBlockHead(LevelChunk chunk, BlockPos pos, BlockState newState, int flags) {
         if (!enabled) {
             return;
         }
@@ -570,7 +570,15 @@ public final class CascadeEngine {
         }
         if (oldState.getBlock() == newState.getBlock()
                 && !NetworkCache.conductorChanged(level, pos, oldState, newState)) {
-            return;   // value-only change — the RETURN sentinel keeps cached values live
+            // Value-only change — the RETURN sentinel keeps cached values live. Inside a
+            // session, a non-wire block that changes with neighbor updates (copper bulb,
+            // note block, powered rail: flags 3 from its own neighborChanged) enqueues
+            // updates the script did not simulate: vanilla takes over from here.
+            if (inSession && (flags & 1) != 0 && !(newState.getBlock() instanceof RedstoneWireBlock)) {
+                abort(s, ABORT_MUTATION, "synchronous update from "
+                        + newState.getBlock().getDescriptionId() + " @ " + pos.toShortString());
+            }
+            return;
         }
         NetworkCache.onTopologyWriteStart(level, pos, oldState, newState);
         if (inSession) {

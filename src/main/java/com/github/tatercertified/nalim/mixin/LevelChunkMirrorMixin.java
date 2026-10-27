@@ -200,7 +200,7 @@ public abstract class LevelChunkMirrorMixin implements CubeMirror {
     private void oxi$beforeWrite(BlockPos pos, BlockState state, int flags,
                                  CallbackInfoReturnable<BlockState> cir) {
         com.github.tatercertified.nalim.redstone.CascadeEngine.onWorldSetBlockHead(
-                (LevelChunk) (Object) this, pos, state);
+                (LevelChunk) (Object) this, pos, state, flags);
     }
 
     @Inject(method = "setBlockState(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;I)Lnet/minecraft/world/level/block/state/BlockState;",

@@ -222,6 +222,9 @@ def contraption():
     c.append(f"setblock {x + 29} {y} {z + 15} minecraft:stone")
     c.append(f"setblock {x + 29} {y + 1} {z + 15} minecraft:redstone_wire")
     c.append(f"setblock {x + 19} {y} {z + 15} minecraft:redstone_block")
+    # (e) copper bulb at the end of line (b): it flips with flags 3 inside the cascade and
+    # sends neighbor updates the wire script does not model
+    c.append(f"setblock {x + 10} {y} {z + 15} minecraft:copper_bulb")
     # start the clock last (second observer completes the pair)
     c.append(f"setblock {x + 1} {y} {z + 1} minecraft:observer[facing=east]")
     c.append(f"setblock {x + 2} {y} {z + 1} minecraft:observer[facing=west]")
