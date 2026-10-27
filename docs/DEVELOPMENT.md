@@ -144,6 +144,7 @@ been pushed there.
 - Redstone fixture recorder and R2 shadow are reachable only through their config files.
 - `oxi_redstone_entry` saves the network powers on every call for `oxi_redstone_undo`,
   which only the R2 shadow uses.
-- Spawn-cap near-player set assumes view distance ≥ 8 chunks.
+- Spawn-cap near-player test uses live positions only; vanilla's 8-chunk player tracker
+  lags a player who just moved more than 8 chunks (one-tick transient).
 - License: `LICENSE.txt` (MIT) covers the original project; `LICENSE-GPL-3.0.txt` came with
   the former `nalim/` module (`com.github.tatercertified.nalim.*`). `fabric.mod.json` says MIT.

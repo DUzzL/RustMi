@@ -14,9 +14,13 @@
 //   * pack reserve: atomically +count to EVERY near player; approve when any old count < cap,
 //                   otherwise roll every touched counter back exactly (Fabrolia contract)
 //   * near player : !spectator && euclidean²(chunkCenter, player) < 16384  (128 blocks)
-//                   chunkCenter = (cx*16+8, cz*16+8); matches getPlayersCloseForSpawning
-//                   (assumes view-distance >= 8 chunks so tracking ⊇ spawn range — the
-//                   normal case; the one known approximation of vanilla)
+//                   chunkCenter = (cx*16+8, cz*16+8); matches getPlayersCloseForSpawning.
+//                   Vanilla first asks DistanceManager.hasPlayersNearby, a fixed 8-chunk
+//                   tracker (independent of view distance) fed by the player's registered
+//                   chunk; every chunk centre < 128 blocks away is within 8 chunks, so the
+//                   two agree while the tracker is current. Known approximation: right after
+//                   a player moves more than 8 chunks, before ChunkMap.move re-registers
+//                   them, vanilla still sees no player near the new chunks and this test does.
 //   * potential   : charge * Σ_i (charge_i / sqrt(distSq_i)), distSq = blockPos.distSqr,
 //                   distSq==0 => +inf, charge==0 => 0 (PotentialCalculator.getPotentialEnergyChange);
 //                   zero charges are never recorded (addCharge)

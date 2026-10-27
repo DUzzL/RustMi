@@ -122,8 +122,9 @@ Each has a vanilla fallback per call: when a precondition is not proven, vanilla
 - `N/spawncap/SpawnCapHooks` registers `RustLocalCapProvider` with Fabrolia's
   `LocalCapBridge` when present; `SpawnCap` is the arena API. Rust: `rs/spawncap/`.
   Rules: `canSpawnForCategoryGlobal` integer division, "no near player ⇒ cannot spawn",
-  `PotentialCalculator` in vanilla summation order. Known approximation: the near-player
-  set assumes view distance ≥ 8 chunks (`rs/spawncap/mod.rs`).
+  `PotentialCalculator` in vanilla summation order. Known approximation: vanilla's
+  8-chunk player tracker lags a player who just moved more than 8 chunks; Rust uses the
+  live 128-block test only (`rs/spawncap/mod.rs`).
 - `N/sort/DistanceSort`: stable distance sort for Fabrolia sensors, reached by name from
   `DistanceSortBridge` in Fabrolia. Rust: `rs/sort/`.
 
