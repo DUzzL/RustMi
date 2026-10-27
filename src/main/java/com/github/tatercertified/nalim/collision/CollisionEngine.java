@@ -221,6 +221,9 @@ public final class CollisionEngine {
         }
     }
 
+    /** Gather coordinates at or beyond this magnitude go to vanilla (int-range safety). */
+    private static final double COORD_LIMIT = 1.0E9;
+
     public static int classify(BlockState s) {
         Byte cached = STATE_CLS.get(s);
         if (cached != null) {
@@ -524,6 +527,14 @@ public final class CollisionEngine {
         double maxX = Math.max(box.maxX, box.maxX + movement.x);
         double maxY = Math.max(box.maxY, box.maxY + movement.y) + step + 1.0E-5;
         double maxZ = Math.max(box.maxZ, box.maxZ + movement.z);
+        // Mth.floor saturates/wraps beyond the int range and the padded bounds below would
+        // overflow, making the cell cap pass with an empty chunk loop: vanilla handles those.
+        if (!(Math.max(Math.abs(minX), Math.abs(maxX)) < COORD_LIMIT
+                && Math.max(Math.abs(minY), Math.abs(maxY)) < COORD_LIMIT
+                && Math.max(Math.abs(minZ), Math.abs(maxZ)) < COORD_LIMIT)) {
+            stats.bail(1);
+            return null;
+        }
 
         int gx0 = Mth.floor(minX - 1.0E-7), gx1 = Mth.floor(maxX + 1.0E-7);
         int gy0 = Mth.floor(minY - 1.0E-7), gy1 = Mth.floor(maxY + 1.0E-7);
