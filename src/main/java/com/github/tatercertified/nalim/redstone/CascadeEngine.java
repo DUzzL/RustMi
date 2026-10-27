@@ -586,6 +586,12 @@ public final class CascadeEngine {
             break;   // one member is enough — entries are per-network
         }
         LOGGER.warn("[redstone-engine] abort: {} (cursor {}/{})", why, s.cursor, s.count);
+        if (s.cursor == 0) {
+            // Nothing was emitted: the world and the live collector are exactly vanilla's,
+            // and the evaluation that aborted runs vanilla. Re-derivation would only add
+            // neighborChanged calls vanilla never makes.
+            return;
+        }
         for (Map.Entry<BlockPos, CascadeRecorder.Node> e : s.network.entrySet()) {
             Integer want = s.finalPower.get(e.getKey());
             if (want == null) {
