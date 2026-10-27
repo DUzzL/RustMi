@@ -13,7 +13,7 @@ parking_lot = "0.12.5"
 # macOS keeps the system allocator: mimalloc v3 needs CommonCrypto headers that the zig
 # toolchain able to link Mach-O dylibs (0.14) does not ship.
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-mimalloc = {git = "https://github.com/ralfbiedert/mimalloc_rust", features = ["v3"]}
+mimalloc = {git = "https://github.com/ralfbiedert/mimalloc_rust", rev = "36142562d70868493cbed3891a4b6488e0156e88", features = ["v3"]}
 
 [build-dependencies]
 cbindgen = "0.29.2"
