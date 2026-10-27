@@ -1,6 +1,7 @@
 package com.github.tatercertified.nalim;
 
 import com.github.tatercertified.nalim.cramming.RustmiCramming;
+import com.github.tatercertified.nalim.rust.AbiProbe;
 import com.github.tatercertified.nalim.rust.FfmBindings;
 import com.github.tatercertified.nalim.rust.NalimBindings;
 import org.slf4j.Logger;
@@ -146,6 +147,31 @@ public final class NativeBackend {
         checkLayout("Nalim",
                 NalimBindings.oxi_cramming_input_size(),
                 NalimBindings.oxi_cramming_output_size());
+        AbiProbe.run("Nalim", new AbiProbe.Calls() {
+            public int distanceSort(long xs, long ys, long zs, double tx, double ty, double tz, int n, long perm) {
+                return NalimBindings.oxi_distance_sort(xs, ys, zs, tx, ty, tz, n, perm);
+            }
+
+            public long sectionAlloc(int words) {
+                return NalimBindings.oxi_section_alloc(words);
+            }
+
+            public void sectionFree(long addr, int words) {
+                NalimBindings.oxi_section_free(addr, words);
+            }
+
+            public long spawncapBuild(long entities, int nEnt, long players, int nPlay, int spawnable, long caps) {
+                return NalimBindings.oxi_spawncap_build(entities, nEnt, players, nPlay, spawnable, caps);
+            }
+
+            public int spawncapCanLocal(long handle, int cat, int cx, int cz) {
+                return NalimBindings.oxi_spawncap_can_local(handle, cat, cx, cz);
+            }
+
+            public int spawncapFree(long handle) {
+                return NalimBindings.oxi_spawncap_free(handle);
+            }
+        });
     }
 
     private static void useFfm(String reason) {
@@ -165,12 +191,38 @@ public final class NativeBackend {
             throw new IllegalStateException("Failed to bind the RustMI native library through FFM at "
                     + System.getProperty("rustmi.native.path"), cause);
         }
+        // Nothing to fall back to from here: a failure stops startup with the cause.
+        AbiProbe.run("FFM", new AbiProbe.Calls() {
+            public int distanceSort(long xs, long ys, long zs, double tx, double ty, double tz, int n, long perm) {
+                return FfmBindings.oxi_distance_sort(xs, ys, zs, tx, ty, tz, n, perm);
+            }
+
+            public long sectionAlloc(int words) {
+                return FfmBindings.oxi_section_alloc(words);
+            }
+
+            public void sectionFree(long addr, int words) {
+                FfmBindings.oxi_section_free(addr, words);
+            }
+
+            public long spawncapBuild(long entities, int nEnt, long players, int nPlay, int spawnable, long caps) {
+                return FfmBindings.oxi_spawncap_build(entities, nEnt, players, nPlay, spawnable, caps);
+            }
+
+            public int spawncapCanLocal(long handle, int cat, int cx, int cz) {
+                return FfmBindings.oxi_spawncap_can_local(handle, cat, cx, cz);
+            }
+
+            public int spawncapFree(long handle) {
+                return FfmBindings.oxi_spawncap_free(handle);
+            }
+        });
         publish(Kind.FFM, reason);
     }
 
     /**
      * Confirms the loaded library is this build's (record sizes) and that return values come
-     * back intact. Argument passing is covered by the in-game shadow modes and parity tests.
+     * back intact. Argument passing is checked by {@link AbiProbe} right after.
      */
     private static void checkLayout(String backend, int input, int output) {
         if (input != RustmiCramming.INPUT_STRIDE || output != RustmiCramming.OUTPUT_STRIDE) {

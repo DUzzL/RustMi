@@ -124,6 +124,8 @@ mainTest('regionalCrammingGeometryTest', 'com.github.tatercertified.nalim.crammi
         'Checks regional cramming halo coverage boundaries.')
 mainTest('collisionCompatibilityTest', 'com.github.tatercertified.nalim.collision.CollisionCompatibilityTest',
         'Checks collision fallback precision and mover-predicate gates.')
+mainTest('abiProbeTest', 'com.github.tatercertified.nalim.rust.AbiProbeTest',
+        'Checks that the ABI self-test accepts correct answers and names a wrong one.')
 mainTest('explosionSeenClipTest', 'com.github.tatercertified.nalim.explosion.ExplosionSeenClipTest',
         'Checks full-cube exposure rays against Minecraft shape clipping.')
 
