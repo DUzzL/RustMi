@@ -24,6 +24,7 @@
     "java": ">=25"
   },
   "breaks": {
+    "rustmi_base": "*",
     "rustmi_nalim": "*",
     "rustmi_panama": "*",
     "rustmi_membrane": "*"
