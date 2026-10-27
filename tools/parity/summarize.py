@@ -99,6 +99,15 @@ def main():
                 metrics[f"{cfg}_{k}"] = r[k]
         metrics[f"{cfg}_collision_calls"] = cs.get("calls", 0)
         metrics[f"{cfg}_cramming_calls"] = cr.get("calls", 0)
+        # A zero "bad" count proves nothing when the engine never ran: every checked
+        # feature must show activity (sensor queries exist only with Fabrolia, i.e. LR).
+        active = {"collision": cs.get("calls", 0), "cramming": cr.get("calls", 0),
+                  "explosion": es.get("explosions", 0), "redstone": rd.get("takeovers", 0)}
+        if cfg.startswith("LR-"):
+            active["sensor"] = cr.get("sensorCalls", 0)
+        for feature, count in active.items():
+            if not count:
+                fails[f"{cfg}_{feature}_vacuous"] = 50
 
     total = sum(fails.values())
     print(f"METRIC vanilla_failures={total}")
