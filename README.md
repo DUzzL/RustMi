@@ -35,7 +35,8 @@ call). `-Drustmi.backend=nalim|ffm` forces one. The startup log line
 
 ## Commands
 
-All under `/rustmi` (operator level): `stats`; `cramming|collision|explosion|redstone|
+All under `/rustmi`; reading (`stats`, `… status`) needs permission level 2, every switch
+(`on|off`, shadow modes, `wirecheck`) level 3: `stats`; `cramming|collision|explosion|redstone|
 sections|spawncap on|off`; `… status`; shadow modes that run vanilla alongside and count
 mismatches (`collisionshadow`, `cramming shadow`, `explosion shadow`); `sections wirecheck`.
 Full list: `src/main/java/com/github/tatercertified/nalim/redstone/RustmiCommands.java`.

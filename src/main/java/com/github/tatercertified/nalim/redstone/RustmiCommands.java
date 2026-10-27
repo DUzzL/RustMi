@@ -54,7 +54,7 @@ public final class RustmiCommands {
                                 com.github.tatercertified.nalim.cramming.CrammingShadow::setEnabled)))
                 .then(toggleCommand("sections",
                         NativeSections::enabled, NativeSections::setEnabled)
-                        .then(Commands.literal("wirecheck").executes(ctx -> sendLine(ctx,
+                        .then(adminLiteral("wirecheck").executes(ctx -> sendLine(ctx,
                                 com.github.tatercertified.nalim.sections.WireCheck.run(ctx.getSource().getLevel())))))
                 .then(collisionCommand())
                 .then(toggleCommand("collisionshadow",
@@ -66,6 +66,13 @@ public final class RustmiCommands {
                 .then(toggleCommand("spawncap",
                         com.github.tatercertified.nalim.spawncap.SpawnCapHooks::isEnabled,
                         com.github.tatercertified.nalim.spawncap.SpawnCapHooks::setEnabled)));
+    }
+
+    /** Switches and heavy checks need admin level (3): they persist engine state and can
+     *  stall the tick. Reading stats/status stays at the root's gamemaster level (2), so
+     *  command blocks cannot flip engines. */
+    private static LiteralArgumentBuilder<CommandSourceStack> adminLiteral(String name) {
+        return Commands.literal(name).requires(Commands.hasPermission(Commands.LEVEL_ADMINS));
     }
 
     private static int sendLine(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx, String line) {
@@ -115,14 +122,14 @@ public final class RustmiCommands {
                     sendToggleResult(ctx, name, state, false);
                     return 1;
                 })
-                .then(Commands.literal("on").executes(ctx -> {
+                .then(adminLiteral("on").executes(ctx -> {
                     setter.accept(true);
-                    sendToggleResult(ctx, name, true, true);
+                    sendToggleResult(ctx, name, getter.getAsBoolean(), true);
                     return 1;
                 }))
-                .then(Commands.literal("off").executes(ctx -> {
+                .then(adminLiteral("off").executes(ctx -> {
                     setter.accept(false);
-                    sendToggleResult(ctx, name, false, true);
+                    sendToggleResult(ctx, name, getter.getAsBoolean(), true);
                     return 1;
                 }));
     }
@@ -135,12 +142,12 @@ public final class RustmiCommands {
                     sendToggleResult(ctx, "collision", CollisionEngine.isEngine(), false);
                     return 1;
                 })
-                .then(Commands.literal("on").executes(ctx -> {
+                .then(adminLiteral("on").executes(ctx -> {
                     CollisionEngine.setEngine(true);
                     sendToggleResult(ctx, "collision", true, true);
                     return 1;
                 }))
-                .then(Commands.literal("off").executes(ctx -> {
+                .then(adminLiteral("off").executes(ctx -> {
                     CollisionEngine.setEngine(false);
                     sendToggleResult(ctx, "collision", false, true);
                     return 1;
@@ -163,34 +170,34 @@ public final class RustmiCommands {
                     sendToggleResult(ctx, "explosion", ExplosionEngine.isEngine(), false);
                     return 1;
                 })
-                .then(Commands.literal("on").executes(ctx -> {
+                .then(adminLiteral("on").executes(ctx -> {
                     ExplosionEngine.setEngine(true);
                     sendToggleResult(ctx, "explosion", true, true);
                     return 1;
                 }))
-                .then(Commands.literal("off").executes(ctx -> {
+                .then(adminLiteral("off").executes(ctx -> {
                     ExplosionEngine.setEngine(false);
                     sendToggleResult(ctx, "explosion", false, true);
                     return 1;
                 }))
                 .then(Commands.literal("shadow")
-                        .then(Commands.literal("on").executes(ctx -> {
+                        .then(adminLiteral("on").executes(ctx -> {
                             ExplosionEngine.setShadow(true);
                             sendToggleResult(ctx, "explosion shadow", true, true);
                             return 1;
                         }))
-                        .then(Commands.literal("off").executes(ctx -> {
+                        .then(adminLiteral("off").executes(ctx -> {
                             ExplosionEngine.setShadow(false);
                             sendToggleResult(ctx, "explosion shadow", false, true);
                             return 1;
                         })))
                 .then(Commands.literal("seenfast")
-                        .then(Commands.literal("on").executes(ctx -> {
+                        .then(adminLiteral("on").executes(ctx -> {
                             ExplosionEngine.setSeenFast(true);
                             sendToggleResult(ctx, "explosion seenfast", true, true);
                             return 1;
                         }))
-                        .then(Commands.literal("off").executes(ctx -> {
+                        .then(adminLiteral("off").executes(ctx -> {
                             ExplosionEngine.setSeenFast(false);
                             sendToggleResult(ctx, "explosion seenfast", false, true);
                             return 1;
