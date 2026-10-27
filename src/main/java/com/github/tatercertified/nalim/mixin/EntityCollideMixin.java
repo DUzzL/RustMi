@@ -30,6 +30,11 @@ public abstract class EntityCollideMixin {
         if (self.level().isClientSide() || movement.lengthSqr() == 0.0) {
             return original.call(movement);
         }
+        // Debug-world chunks synthesize their blocks in getBlockState; the sections the
+        // mirror reads stay empty.
+        if (self.level().isDebug()) {
+            return original.call(movement);
+        }
         if (CollisionEngine.requiresVanillaPrecision(movement)) {
             CollisionEngine.countPrecisionBail(movement);
             return original.call(movement);

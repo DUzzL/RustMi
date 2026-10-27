@@ -42,6 +42,9 @@ public final class SupportingBlock {
                 || (source instanceof AbstractMinecart && AbstractMinecart.useExperimentalMovement(level))) {
             return null;   // MinecartCollisionContext ignores cells the mirror would report
         }
+        if (level.isDebug()) {
+            return null;   // debug-world blocks exist only in getBlockState, not in the sections
+        }
         int x0 = net.minecraft.util.Mth.floor(box.minX - 1.0E-7) - 1;
         int x1 = net.minecraft.util.Mth.floor(box.maxX + 1.0E-7) + 1;
         int y0 = net.minecraft.util.Mth.floor(box.minY - 1.0E-7) - 1;

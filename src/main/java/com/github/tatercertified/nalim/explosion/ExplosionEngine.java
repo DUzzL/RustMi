@@ -392,6 +392,11 @@ public final class ExplosionEngine {
     }
 
     private static boolean qualify(Ctx c) {
+        if (c.level.isDebug()) {
+            // Debug-world blocks exist only in getBlockState; the section snapshot sees air.
+            lastDisqualify = "debug world";
+            return false;
+        }
         if (c.radius > MAX_RADIUS || !(c.radius > 0.0f)) {
             lastDisqualify = "radius=" + c.radius;
             return false;
