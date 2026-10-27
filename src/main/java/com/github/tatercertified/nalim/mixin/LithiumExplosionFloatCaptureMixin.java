@@ -25,8 +25,11 @@ public abstract class LithiumExplosionFloatCaptureMixin {
             mixin = "net.caffeinemc.mods.lithium.mixin.world.explosions.block_raycast.ServerExplosionMixin",
             name = "performRayCast"
     )
+    // require = 0: a Lithium update that renames performRayCast, or block_raycast turned off
+    // in lithium.properties, must not stop the server; the shadow then reports floatCount=0.
     @WrapOperation(method = "@MixinSquared:Handler",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/util/RandomSource;nextFloat()F"))
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/util/RandomSource;nextFloat()F"),
+            require = 0)
     private float rustmi$captureFloatLithium(RandomSource rs, Operation<Float> original) {
         // Volatile pre-check: with shadow off this is the only cost
         // (engine mode takes the sweep over before performRayCast can run).
