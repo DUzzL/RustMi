@@ -29,7 +29,7 @@ def load(name):
 def regions(a, b, smin, smax, mode="exact"):
     out = subprocess.run([sys.executable, os.path.join(HERE, "regions.py"),
                           os.path.join(STAND, "runs", a), os.path.join(STAND, "runs", b), *BOX,
-                          str(smin), str(smax), mode], capture_output=True, text=True)
+                          str(smin), str(smax), mode], capture_output=True, text=True, timeout=600)
     if out.returncode != 0:
         return None
     return json.loads(out.stdout)

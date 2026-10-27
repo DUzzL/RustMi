@@ -26,6 +26,8 @@ fi
 mkdir -p "$STAND/logs" "$STAND/runs"
 
 cd "$REPO" || exit 1
+# drive.py takes the one jar in build/libs; an old version left there would be ambiguous.
+rm -f "$REPO"/build/libs/rustmi-*.jar
 if ! ./gradlew build --console=plain > "$STAND/logs/build.log" 2>&1; then
     echo "METRIC vanilla_failures=1000"
     echo "ASI stage=build"
@@ -39,6 +41,7 @@ cp "$HERE/config/"* "$STAND/server/config/"
 ref_key() {
     {
         sha256sum "$STAND/server/fabric-server-launch.jar" "$HERE/drive.py" "$HERE"/config/* | cut -d' ' -f1
+        "$JAVA_HOME/bin/java" -version 2>&1
         if [ "$1" = L ]; then sha256sum "$STAND"/jars/*.jar | cut -d' ' -f1; fi
     } | sha256sum | cut -d' ' -f1
 }

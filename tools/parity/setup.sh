@@ -25,6 +25,7 @@ if [ ! -f "$STAND/server/fabric-server-launch.jar" ]; then
     curl -fsSL -o "$STAND/server/fabric-server-launch.jar" \
         "https://meta.fabricmc.net/v2/versions/loader/$MC/$LOADER/$INSTALLER/server/jar"
 fi
+# The stand is a throwaway test server; running it accepts the Minecraft EULA.
 echo "eula=true" > "$STAND/server/eula.txt"
 cp "$HERE/config/"* "$STAND/server/config/"
 
@@ -33,13 +34,28 @@ for entry in "${JARS[@]}"; do
     dest="$STAND/jars/$name"
     if [ ! -f "$dest" ]; then
         curl -fsSL -o "$dest.part" "$url"
+        actual=$(sha512sum "$dest.part" | cut -d" " -f1)
+        if [ "$actual" != "$sha" ]; then
+            rm -f "$dest.part"
+            echo "sha512 mismatch for $name: $actual, expected $sha" >&2
+            exit 1
+        fi
         mv "$dest.part" "$dest"
     fi
     actual=$(sha512sum "$dest" | cut -d" " -f1)
     if [ "$actual" != "$sha" ]; then
-        echo "sha512 mismatch for $name: $actual, expected $sha" >&2
+        echo "sha512 mismatch for $name: $actual, expected $sha (delete it to download again)" >&2
         exit 1
     fi
+done
+# Jars of earlier pins would join the Lithium stack: keep only the pinned ones.
+for jar in "$STAND"/jars/*.jar; do
+    keep=0
+    for entry in "${JARS[@]}"; do
+        [ "$(basename "$jar")" = "${entry%%|*}" ] && keep=1
+    done
+    case "$(basename "$jar")" in fabrolia-*) keep=1 ;; esac
+    [ "$keep" = 1 ] || rm -f "$jar"
 done
 
 if [ -z "$FABROLIA_JAR" ] || [ ! -f "$FABROLIA_JAR" ]; then

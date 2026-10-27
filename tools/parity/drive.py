@@ -24,6 +24,7 @@ import sys
 import threading
 import time
 import queue
+import signal
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
@@ -57,6 +58,7 @@ STEPS = 400
 OX, OY, OZ = 960, 300, 960
 
 PROPERTIES = f"""online-mode=false
+server-ip=127.0.0.1
 level-seed={SEED}
 view-distance=4
 simulation-distance=4
@@ -583,6 +585,9 @@ def ram(s, res):
 
 
 def main():
+    # A killed harness (SIGTERM/SIGHUP) must still stop its server: SystemExit runs the finally.
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, lambda *_: sys.exit(143))
     cfg, outdir = sys.argv[1], sys.argv[2]
     shutil.rmtree(outdir, ignore_errors=True)
     os.makedirs(outdir)

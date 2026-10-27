@@ -16,6 +16,10 @@ build/
 /stand/
 /release/
 
+# JVM crash logs and recordings
+hs_err_pid*.log
+*.jfr
+
 # IDE / tooling
 .DS_Store
 /.idea/
