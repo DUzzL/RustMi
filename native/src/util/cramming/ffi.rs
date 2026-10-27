@@ -40,11 +40,15 @@ pub unsafe extern "C" fn oxi_cramming_batch(
 /// verify struct sizes match — if anyone ever changes the Rust struct
 /// without updating the Java accessor, this will trip during the smoke
 /// test before any real entity is ticked.
+/// # Safety
+/// No preconditions (no pointer arguments).
 #[no_mangle]
 pub unsafe extern "C" fn oxi_cramming_input_size() -> i32 {
     std::mem::size_of::<CrammingInput>() as i32
 }
 
+/// # Safety
+/// No preconditions (no pointer arguments).
 #[no_mangle]
 pub unsafe extern "C" fn oxi_cramming_output_size() -> i32 {
     std::mem::size_of::<CrammingOutput>() as i32
@@ -63,6 +67,9 @@ pub extern "C" fn oxi_sensor_pad() -> f64 {
 /// Retain a batch's input buffer for lazy sensor-range queries during the
 /// region's entity tick. `handle` is the region id; the Java side guarantees
 /// the buffer outlives begin..end.
+///
+/// # Safety
+/// `inputs_ptr` must be null or point to `n` input records that stay valid until `oxi_sensor_end`.
 #[no_mangle]
 pub unsafe extern "C" fn oxi_sensor_begin(handle: u64, inputs_ptr: *const CrammingInput, n: i32) {
     if inputs_ptr.is_null() || n <= 0 {
@@ -71,6 +78,8 @@ pub unsafe extern "C" fn oxi_sensor_begin(handle: u64, inputs_ptr: *const Crammi
     super::sensor::sensor_begin(handle, inputs_ptr as usize, n as usize);
 }
 
+/// # Safety
+/// No pointer arguments; ends the handle's retained view of the input buffer.
 #[no_mangle]
 pub unsafe extern "C" fn oxi_sensor_end(handle: u64) {
     super::sensor::sensor_end(handle);
@@ -78,6 +87,9 @@ pub unsafe extern "C" fn oxi_sensor_end(handle: u64) {
 
 /// Candidate slots within `range` (vanilla FOLLOW_RANGE) of `slot`, padded
 /// superset semantics. Returns count, or -1 → caller runs the vanilla query.
+///
+/// # Safety
+/// Pointer arguments must be null or point to buffers of the sizes described above.
 #[no_mangle]
 pub unsafe extern "C" fn oxi_sensor_query(
     handle: u64,
@@ -99,6 +111,9 @@ pub unsafe extern "C" fn oxi_sensor_query(
 /// kernel's per-row candidate lists, no 127-slot cap. Returns the count,
 /// or -1 (unknown handle / slot out of range / more than `out_cap`
 /// candidates) — caller falls back to the vanilla section walk.
+///
+/// # Safety
+/// Pointer arguments must be null or point to buffers of the sizes described above.
 #[no_mangle]
 pub unsafe extern "C" fn oxi_cramming_query(
     handle: u64,

@@ -110,9 +110,15 @@ void oxi_cramming_batch(const struct CrammingInput *inputs_ptr,
  * verify struct sizes match — if anyone ever changes the Rust struct
  * without updating the Java accessor, this will trip during the smoke
  * test before any real entity is ticked.
+ * # Safety
+ * No preconditions (no pointer arguments).
  */
 int32_t oxi_cramming_input_size(void);
 
+/**
+ * # Safety
+ * No preconditions (no pointer arguments).
+ */
 int32_t oxi_cramming_output_size(void);
 
 double oxi_cramming_pad(void);
@@ -123,14 +129,24 @@ double oxi_sensor_pad(void);
  * Retain a batch's input buffer for lazy sensor-range queries during the
  * region's entity tick. `handle` is the region id; the Java side guarantees
  * the buffer outlives begin..end.
+ *
+ * # Safety
+ * `inputs_ptr` must be null or point to `n` input records that stay valid until `oxi_sensor_end`.
  */
 void oxi_sensor_begin(uint64_t handle, const struct CrammingInput *inputs_ptr, int32_t n);
 
+/**
+ * # Safety
+ * No pointer arguments; ends the handle's retained view of the input buffer.
+ */
 void oxi_sensor_end(uint64_t handle);
 
 /**
  * Candidate slots within `range` (vanilla FOLLOW_RANGE) of `slot`, padded
  * superset semantics. Returns count, or -1 → caller runs the vanilla query.
+ *
+ * # Safety
+ * Pointer arguments must be null or point to buffers of the sizes described above.
  */
 int32_t oxi_sensor_query(uint64_t handle,
                          int32_t slot,
@@ -145,6 +161,9 @@ int32_t oxi_sensor_query(uint64_t handle,
  * kernel's per-row candidate lists, no 127-slot cap. Returns the count,
  * or -1 (unknown handle / slot out of range / more than `out_cap`
  * candidates) — caller falls back to the vanilla section walk.
+ *
+ * # Safety
+ * Pointer arguments must be null or point to buffers of the sizes described above.
  */
 int32_t oxi_cramming_query(uint64_t handle, int32_t slot, int32_t *out_ptr, int32_t out_cap);
 
@@ -221,6 +240,9 @@ void oxi_redstone_end(uint64_t handle);
 /**
  * Allocate a zeroed native u64 array of `words` elements, 64-aligned.
  * Returns the address, or 0 on bad args / OOM.
+ *
+ * # Safety
+ * No pointer arguments; the returned block must be released with `oxi_section_free`.
  */
 int64_t oxi_section_alloc(int32_t words);
 

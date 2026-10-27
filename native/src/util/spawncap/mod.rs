@@ -81,7 +81,8 @@ impl SpawnCapState {
         self.players
             .iter()
             .enumerate()
-            .filter_map(move |(i, p)| near(p, cx, cz).then(|| self.local_idx(i, cat)))
+            .filter(move |&(_, p)| near(p, cx, cz))
+            .map(move |(i, _)| self.local_idx(i, cat))
     }
 
     /// vanilla canSpawnForCategoryGlobal

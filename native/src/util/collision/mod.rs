@@ -63,11 +63,11 @@ impl Aabb {
     #[inline]
     fn stretch(&self, d: [f64; 3]) -> Aabb {
         let mut r = *self;
-        for a in 0..3 {
-            if d[a] < 0.0 {
-                r.min[a] += d[a];
+        for (a, &da) in d.iter().enumerate() {
+            if da < 0.0 {
+                r.min[a] += da;
             } else {
-                r.max[a] += d[a];
+                r.max[a] += da;
             }
         }
         r

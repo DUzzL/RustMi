@@ -60,7 +60,7 @@ pub unsafe extern "C" fn oxi_collide(
     let hi = header_ptr.add(76) as *const i32;
     let on_ground = hi.read_unaligned() != 0;
     let count = hi.add(1).read_unaligned();
-    if count < 0 || count > 1 << 20 || (count > 0 && solids_ptr.is_null()) {
+    if !(0..=1 << 20).contains(&count) || (count > 0 && solids_ptr.is_null()) {
         return -1;
     }
     if !finite_inputs(&bb, &delta, step) {

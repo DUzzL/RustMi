@@ -26,7 +26,7 @@ pub mod ffi {
         n: i32,
         out_perm: *mut i32,
     ) -> i32 {
-        if n < 0 || n > 1 << 20 {
+        if !(0..=1 << 20).contains(&n) {
             return -1;
         }
         let n = n as usize;

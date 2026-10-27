@@ -65,6 +65,9 @@ pub mod ffi {
 
     /// Allocate a zeroed native u64 array of `words` elements, 64-aligned.
     /// Returns the address, or 0 on bad args / OOM.
+    ///
+    /// # Safety
+    /// No pointer arguments; the returned block must be released with `oxi_section_free`.
     #[no_mangle]
     pub unsafe extern "C" fn oxi_section_alloc(words: i32) -> i64 {
         if words <= 0 || words > 1 << 20 {

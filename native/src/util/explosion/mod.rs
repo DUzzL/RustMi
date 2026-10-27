@@ -183,7 +183,7 @@ where
     if let Some(a) = air_out.as_deref_mut() {
         a.clear();
     }
-    let mut seen = vec![0u64; (cells + 63) / 64];
+    let mut seen = vec![0u64; cells.div_ceil(64)];
 
     let mut fi = 0usize;
     for xx in 0..16 {
@@ -219,10 +219,8 @@ where
                     // Level.isInWorldBounds: height + ±30M horizontal.
                     if by < bounds.min_y
                         || by >= bounds.max_y
-                        || bx < -30_000_000
-                        || bx >= 30_000_000
-                        || bz < -30_000_000
-                        || bz >= 30_000_000
+                        || !(-30_000_000..30_000_000).contains(&bx)
+                        || !(-30_000_000..30_000_000).contains(&bz)
                     {
                         break;
                     }
@@ -578,7 +576,7 @@ mod tests {
                             blob.extend_from_slice(&r.to_le_bytes());
                         }
                         let data_off = blob.len();
-                        let nlongs = (4096 + vpl as usize - 1) / vpl as usize;
+                        let nlongs = 4096_usize.div_ceil(vpl as usize);
                         let mut longs = vec![0u64; nlongs];
                         for cell in 0..4096usize {
                             let (cy, cz, cx) = (cell >> 8, (cell >> 4) & 15, cell & 15);

@@ -580,7 +580,7 @@ mod tests {
         assert_eq!(slots(&out[1]), vec![0]);
 
         let far = mob(2.9, 0.0, PUSH);
-        let out2 = run(&[ghast.clone(), far]);
+        let out2 = run(&[ghast, far]);
         assert_eq!(out2[0].count, 0);
         assert_eq!(out2[1].count, 0);
     }

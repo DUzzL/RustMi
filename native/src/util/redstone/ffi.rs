@@ -39,8 +39,7 @@ pub unsafe extern "C" fn oxi_redstone_begin(
     if nodes_ptr.is_null()
         || n <= 0
         || n > 1 << 20
-        || edge_count < 0
-        || edge_count > 1 << 24
+        || !(0..=1 << 24).contains(&edge_count)
         || (edge_count > 0 && edges_ptr.is_null())
     {
         return -1;

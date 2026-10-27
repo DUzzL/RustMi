@@ -177,6 +177,10 @@ impl Grid<'_> {
 /// [ox, oy, oz: f64×3][nx, ny, nz, nWords: i32×4]
 /// [coordsX: (nx+1)×f64][coordsY][coordsZ][bits: nWords×u64].
 /// Returns parsed grids borrowing the buffer.
+///
+/// # Safety
+/// `addr` must point to `count` complete grid records laid out as above, alive and unmodified
+/// for as long as the returned grids are used.
 pub unsafe fn parse_grids(addr: *const u8, count: usize) -> Vec<Grid<'static>> {
     let mut out = Vec::with_capacity(count);
     let mut p = addr;
