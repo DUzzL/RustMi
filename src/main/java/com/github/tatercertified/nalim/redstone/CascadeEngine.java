@@ -637,11 +637,18 @@ public final class CascadeEngine {
             NetworkCache.dropContaining(s.level, member);
             break;   // one member is enough — entries are per-network
         }
-        LOGGER.warn("[redstone-engine] abort: {} (cursor {}/{})", why, s.cursor, s.count);
+        long nowMs = System.currentTimeMillis();
+        long last = LAST_ABORT_WARN_MS.get();
+        if (nowMs - last >= 1000 && LAST_ABORT_WARN_MS.compareAndSet(last, nowMs)) {
+            // At most one line per second; /rustmi redstone status counts every abort.
+            LOGGER.warn("[redstone-engine] abort: {} (cursor {}/{})", why, s.cursor, s.count);
+        }
         // No re-derivation: every emitted span was a complete evaluator body whose updates
         // are already queued in the live collector, so vanilla continues from here and makes
         // exactly the remaining dispatches. Extra neighborChanged calls would not be vanilla.
     }
+
+    private static final AtomicLong LAST_ABORT_WARN_MS = new AtomicLong();
 
     /** Rate-limit ABORT_LEFTOVER warns: 1 line/sec across the server (most
      *  bursts come from the same lag-machine and produce identical context;

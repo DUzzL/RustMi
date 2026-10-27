@@ -73,21 +73,27 @@ public final class AbiProbeTest {
     public static void main(String[] args) {
         AbiProbe.run("model", new Model());
 
-        // A broken convention: the target's y and z swap places.
-        String msg = null;
-        try {
-            AbiProbe.run("broken", new Model() {
-                @Override
-                public int distanceSort(long xs, long ys, long zs, double tx, double ty, double tz, int n, long perm) {
-                    return super.distanceSort(xs, ys, zs, tz, ty, tx, n, perm);
-                }
-            });
-        } catch (IllegalStateException e) {
-            msg = e.getMessage();
+        // Broken conventions: two target coordinates swap places.
+        for (int swap = 0; swap < 3; swap++) {
+            final int k = swap;
+            String msg = null;
+            try {
+                AbiProbe.run("broken", new Model() {
+                    @Override
+                    public int distanceSort(long xs, long ys, long zs, double tx, double ty, double tz, int n, long perm) {
+                        return k == 0 ? super.distanceSort(xs, ys, zs, ty, tx, tz, n, perm)
+                                : k == 1 ? super.distanceSort(xs, ys, zs, tx, tz, ty, n, perm)
+                                : super.distanceSort(xs, ys, zs, tz, ty, tx, n, perm);
+                    }
+                });
+            } catch (IllegalStateException e) {
+                msg = e.getMessage();
+            }
+            if (msg == null || !msg.contains("oxi_distance_sort")) {
+                throw new AssertionError("swap " + k + " in the distance sort not reported: " + msg);
+            }
         }
-        if (msg == null || !msg.contains("oxi_distance_sort")) {
-            throw new AssertionError("broken distance sort not reported: " + msg);
-        }
+        String msg;
 
         // A broken six-argument call: the caps pointer arrives as the spawnable count.
         msg = null;

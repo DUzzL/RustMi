@@ -874,8 +874,9 @@ public final class CollisionEngine {
         return shadow;
     }
 
+    /** False while faulted: the fast paths are off until `/rustmi collision on`. */
     public static boolean isEngine() {
-        return engine;
+        return engine && !faulted;
     }
 
 }

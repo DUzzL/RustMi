@@ -55,13 +55,14 @@ public final class AbiProbe {
 
     private static void probeDistanceSort(String backend, Calls calls, long mem) {
         long xs = mem, ys = mem + 24, zs = mem + 48, perm = mem + 72;
-        double[] x = {5.0, 0.0, 1.0};
+        double[][] p = {{5.0, 2.0, -3.0}, {0.0, 0.0, 0.0}, {1.0, 2.0, -3.0}};
         for (int i = 0; i < 3; i++) {
-            U.putDouble(xs + i * 8L, x[i]);
-            U.putDouble(ys + i * 8L, 0.0);
-            U.putDouble(zs + i * 8L, 0.0);
+            U.putDouble(xs + i * 8L, p[i][0]);
+            U.putDouble(ys + i * 8L, p[i][1]);
+            U.putDouble(zs + i * 8L, p[i][2]);
         }
-        // Distances from (0.9, 2, -3): 0.01 + 13, 0.81 + 13, 16.81 + 13 -> order 2, 1, 0.
+        // Squared distances from (0.9, 2, -3): 16.81, 13.81, 0.01 -> order 2, 1, 0. Any swap of
+        // the three target coordinates changes the order (e.g. y/z swapped: 1, 2, 0).
         int rc = calls.distanceSort(xs, ys, zs, 0.9, 2.0, -3.0, 3, perm);
         if (rc != 0 || U.getInt(perm) != 2 || U.getInt(perm + 4) != 1 || U.getInt(perm + 8) != 0) {
             throw fail(backend, "oxi_distance_sort", "rc=" + rc + " perm=" + U.getInt(perm) + ","

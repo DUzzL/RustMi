@@ -103,6 +103,15 @@ public class LoadRustBinary {
                 Path tmp = Files.createTempFile(destinationPath.getParent(), outputName, ".part");
                 try {
                     Files.copy(inputStream, tmp, StandardCopyOption.REPLACE_EXISTING);
+                    try {
+                        // createTempFile makes the file owner-only (0600); a library written by
+                        // Files.copy before was world-readable, and a server started later by
+                        // another user must still be able to hash and load it.
+                        Files.setPosixFilePermissions(tmp,
+                                java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+                    } catch (UnsupportedOperationException ignored) {
+                        // not a POSIX file system (Windows): default ACLs apply
+                    }
                     if (!HashUtils.checkHash(tmp, binaryNameNoExt)) {
                         throw new IOException("extracted " + binaryName + " does not match its bundled SHA-256");
                     }
