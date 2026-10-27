@@ -90,6 +90,11 @@ public final class NativeSections {
      */
     public static BitStorage swapToNative(BitStorage storage) {
         if (storage instanceof SimpleBitStorage simple && usable()) {
+            if (simple.getSize() < MIN_NATIVE_ENTRIES) {
+                // Biome storages (64 entries, 1-8 words): a native block plus its Cleaner
+                // registration costs more heap than the words it moves off-heap.
+                return storage;
+            }
             if (NativeBitStorage.liveBytes() >= MAX_NATIVE_BYTES) {
                 // No back-pressure from the GC on native memory: past the ceiling new storages
                 // stay on the heap (identical results), which in turn lets the GC run the Cleaner.
@@ -105,6 +110,9 @@ public final class NativeSections {
         }
         return storage;
     }
+
+    /** Block-state storages have 4096 entries, biome storages 64. */
+    private static final int MIN_NATIVE_ENTRIES = 1024;
 
     /** {@code -Drustmi.sections.maxMiB}; default a quarter of the maximum heap. */
     private static final long MAX_NATIVE_BYTES = Long.getLong("rustmi.sections.maxMiB",
