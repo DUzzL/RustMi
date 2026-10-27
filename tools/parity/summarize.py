@@ -108,7 +108,8 @@ def main():
     print("ASI failures=" + json.dumps(nz, separators=(",", ":")))
     for k, v in asi.items():
         print(f"ASI {k}={json.dumps(v)}")
+    return 1 if total else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

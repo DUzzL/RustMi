@@ -2,7 +2,8 @@
 # Rustmi vanilla-parity / perf / RAM harness. Builds the jar (`./gradlew build`, which also
 # runs the Java and Rust tests), runs the deterministic scenario on a vanilla and a
 # Lithium+Fabric API+Fabrolia reference, then the same with Rustmi once per native backend,
-# and prints METRIC/ASI lines. Verdict: `METRIC vanilla_failures=0`.
+# and prints METRIC/ASI lines. Verdict: `METRIC vanilla_failures=0`; the exit status is
+# non-zero when the build or any parity check fails.
 #
 # Needs the stand (tools/parity/setup.sh), JAVA_HOME = JDK 25 and the build toolchain
 # (tools/setup-toolchain.sh). Env: RUSTMI_BACKENDS (default "nalim ffm"),
