@@ -262,7 +262,7 @@ fn collect_step_heights(
             }
         }
     }
-    candidates.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    candidates.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     candidates
 }
 
@@ -430,7 +430,7 @@ fn collect_step_heights_boxes(
             }
         }
     }
-    heights.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    heights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     heights
 }
 

@@ -14,6 +14,12 @@
 
 use super::{collide_checked, collide_mixed_checked, grid, Aabb, Collider};
 
+/// A non-finite box, movement or step height (NaN/inf) is not modelled by the kernel;
+/// Java runs vanilla for it (return code 1).
+fn finite_inputs(bb: &Aabb, delta: &[f64; 3], step: f32) -> bool {
+    bb.min.iter().chain(&bb.max).chain(delta).all(|v| v.is_finite()) && step.is_finite()
+}
+
 /// Returns 0 on success, 1 when Java must use the exact fallback, or -1 on bad args.
 ///
 /// # Safety
@@ -51,6 +57,9 @@ pub unsafe extern "C" fn oxi_collide(
     let count = hi.add(1).read_unaligned();
     if count < 0 || count > 1 << 20 || (count > 0 && solids_ptr.is_null()) {
         return -1;
+    }
+    if !finite_inputs(&bb, &delta, step) {
+        return 1;
     }
     let cols: &[[f64; 6]] = if count > 0 {
         std::slice::from_raw_parts(solids_ptr.cast::<[f64; 6]>(), count as usize)
@@ -125,6 +134,9 @@ pub unsafe extern "C" fn oxi_collide2(
         || (collider_count > 0 && tags_ptr.is_null())
     {
         return -1;
+    }
+    if !finite_inputs(&bb, &delta, step) {
+        return 1;
     }
 
     let raw = if solid_count > 0 {
@@ -206,6 +218,26 @@ mod tests {
         assert_eq!(rc, 0);
         for i in 0..3 {
             assert_eq!(out[i].to_bits(), delta[i].to_bits());
+        }
+    }
+
+    #[test]
+    fn non_finite_inputs_fall_back_instead_of_panicking() {
+        let solids = [[0.0, -1.0, 0.0, 1.0, 0.5, 1.0]];
+        let tags = [0u8; 1];
+        let mut nan_box = header([0.5, -0.1, 0.0], 1, 0, 1);
+        unsafe { (nan_box.as_mut_ptr().add(8) as *mut f64).write_unaligned(f64::NAN) };
+        let mut inf_step = header([0.5, -0.1, 0.0], 1, 0, 1);
+        unsafe { (inf_step.as_mut_ptr().add(72) as *mut f32).write_unaligned(f32::INFINITY) };
+        for h in [nan_box, inf_step] {
+            let mut out = [0.0; 3];
+            unsafe {
+                assert_eq!(oxi_collide(h.as_ptr(), solids.as_ptr().cast(), out.as_mut_ptr()), 1);
+                assert_eq!(
+                    oxi_collide2(h.as_ptr(), solids.as_ptr().cast(), std::ptr::null(), tags.as_ptr(), out.as_mut_ptr()),
+                    1
+                );
+            }
         }
     }
 
