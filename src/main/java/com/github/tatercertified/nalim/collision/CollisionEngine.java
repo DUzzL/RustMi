@@ -639,6 +639,10 @@ public final class CollisionEngine {
                                     // kernel's voxel-precise filter drops them, so
                                     // the superset is exact.
                                     BlockState st = lc.getBlockState(new BlockPos(x, y, z));
+                                    if (st == null) {
+                                        stats.bailPartial++;   // racing palette read, see classify
+                                        return null;
+                                    }
                                     double[] flat = boxesFor(st);
                                     if (flat != null) {
                                         if (solidCount >= SOLIDS_CAP) {
