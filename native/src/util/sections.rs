@@ -73,7 +73,10 @@ pub mod ffi {
         }
         let words = words as usize;
         if let Some(ci) = class_of(words) {
-            if let Some(p) = POOLS[ci].lock().free.pop() {
+            // Pop in its own statement: in an `if let` scrutinee the guard would live
+            // through the body and the memset below would run under the pool lock.
+            let popped = POOLS[ci].lock().free.pop();
+            if let Some(p) = popped {
                 // Pooled blocks are returned dirty; zero like alloc_zeroed.
                 std::ptr::write_bytes(p, 0, words * 8);
                 LIVE_BYTES.fetch_add((words * 8) as i64, Ordering::Relaxed);
