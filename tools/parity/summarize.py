@@ -51,6 +51,9 @@ def main():
             fails[f"{cfg}_run_error"] = 50
             asi[f"{cfg}_error"] = r["error"][:200]
         fails[f"{cfg}_log_errors"] = len(r.get("log_errors", []))
+        if r.get("hs_err"):
+            fails[f"{cfg}_jvm_crash"] = 50
+            asi[f"{cfg}_hs_err"] = r["hs_err"]
         # A crash on the way out (e.g. a native fault at shutdown) only shows in the exit code.
         if r.get("exit_code") != 0:
             fails[f"{cfg}_exit_code"] = 50

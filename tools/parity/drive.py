@@ -95,7 +95,8 @@ class Server:
                 self.q.put(line.rstrip("\n"))
             self.q.put(None)
 
-        threading.Thread(target=pump, daemon=True).start()
+        self.pump = threading.Thread(target=pump, daemon=True)
+        self.pump.start()
 
     def cmd(self, c):
         self.p.stdin.write(c + "\n")
@@ -136,12 +137,17 @@ class Server:
         except subprocess.TimeoutExpired:
             self.p.kill()
             self.p.wait()
+        # The last lines (shutdown errors, a native crash banner) arrive after the exit.
+        self.pump.join(10)
 
 
 def prepare(cfg):
     # config/rustmi-runtime holds toggles persisted by /rustmi commands; a run must start from defaults.
     for d in ("world", "config/rustmi", "config/rustmi-runtime", "logs"):
         shutil.rmtree(os.path.join(SERVER, d), ignore_errors=True)
+    for f in os.listdir(SERVER):
+        if f.startswith("hs_err_pid"):
+            os.remove(os.path.join(SERVER, f))
     mods = os.path.join(SERVER, "mods")
     shutil.rmtree(mods, ignore_errors=True)
     os.makedirs(mods)
@@ -559,6 +565,12 @@ def main():
     res["log_errors"] = [l for l in s.lines if re.search(r"/(ERROR|FATAL)\]", l)
                          or "Exception" in l and "Error loading class" not in l][:50]
     res["exit_code"] = s.p.returncode
+    # A JVM crash (e.g. a native fault) leaves hs_err_pid*.log in the server directory.
+    res["hs_err"] = [f for f in os.listdir(SERVER) if f.startswith("hs_err_pid")]
+    for f in res["hs_err"]:
+        shutil.copy(os.path.join(SERVER, f), outdir)
+    if any("# A fatal error has been detected" in l for l in s.lines):
+        res["hs_err"].append("fatal error banner in server output")
     # NativeBackend logs its choice once; harness.sh checks it against the forced mode.
     backend = [m.group(1) for m in (re.search(r"RustMI native backend: (\S+)", l) for l in s.lines) if m]
     res["backend"] = backend[0] if backend else None
