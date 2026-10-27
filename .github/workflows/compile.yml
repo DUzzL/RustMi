@@ -1,7 +1,14 @@
 name: Create Rustmi
 
 on:
-  workflow_dispatch :
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -25,6 +32,14 @@ jobs:
       - name: Rust format
         run: cargo fmt --check --manifest-path native/Cargo.toml
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: native
+
+      - name: Clippy
+        run: cargo clippy --manifest-path native/Cargo.toml --locked --all-targets -- -D warnings
+
       - name: Setup Zig
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
         with:
@@ -39,12 +54,17 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 25
+          cache: gradle
 
       - name: Make Gradlew Executable
         run: chmod +x gradlew
 
       - name: Build and test
         run: ./gradlew build --no-daemon
+
+      - name: native/lib.h is current
+        # cargo regenerates the header from the Rust exports; it must be committed with them.
+        run: git diff --exit-code native/lib.h
 
       - name: Upload Rustmi
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
