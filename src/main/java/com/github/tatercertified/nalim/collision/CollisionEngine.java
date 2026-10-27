@@ -221,6 +221,16 @@ public final class CollisionEngine {
         }
     }
 
+    /**
+     * Vanilla takes step-up candidates from every Y coordinate of a collider
+     * (Entity.collectCandidateStepUpHeights), and a box on a 1/2, 1/4, ... grid becomes a
+     * CubeVoxelShape whose coordinates are the whole grid (top slab: 0, 0.5, 1). A flat box
+     * only knows min/max, so such shapes take the grid route, which adds every coordinate.
+     */
+    private static boolean hasExtraYCoords(net.minecraft.world.phys.shapes.VoxelShape shape) {
+        return shape.getCoords(net.minecraft.core.Direction.Axis.Y).size() > 2;
+    }
+
     /** Gather coordinates at or beyond this magnitude go to vanilla (int-range safety). */
     private static final double COORD_LIMIT = 1.0E9;
 
@@ -242,7 +252,7 @@ public final class CollisionEngine {
                     cls = CLS_EMPTY;
                 } else {
                     var aabbs = shape.toAabbs();
-                    if (aabbs.size() > 1 || hasInternalCellWalls(shape)) {
+                    if (aabbs.size() > 1 || hasInternalCellWalls(shape) || hasExtraYCoords(shape)) {
                         // C3: multi-box shapes (fences/stairs/walls) ship their
                         // ACTUAL merged voxel grid to the kernel — per-box
                         // flattening diverged from vanilla at internal faces
