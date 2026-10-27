@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Installs what `./gradlew build` needs besides a JDK 25 and rustup (Linux host): the five
-# extra Rust targets, cargo-zigbuild 0.23.4, and zig 0.14.1 in ~/.local/opt/zig-0.14.1
+# Installs what `./gradlew build` needs besides a JDK 25 and rustup (Linux host): the Rust
+# toolchain pinned in rust-toolchain.toml (with its six targets), cargo-zigbuild 0.23.4, and
+# zig 0.14.1 in ~/.local/opt/zig-0.14.1
 # (where gradle/natives.gradle looks when ZIG is unset). Tested with zig 0.14.1; 0.16
 # cannot link the macOS libraries.
 set -euo pipefail
 
-rustup target add aarch64-unknown-linux-gnu x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm \
-    x86_64-apple-darwin aarch64-apple-darwin
+cd "$(dirname "$0")/.."
+rustup toolchain install   # reads rust-toolchain.toml: channel, components, targets
 cargo install cargo-zigbuild --locked --version 0.23.4
 
 ZIG_DIR=$HOME/.local/opt/zig-0.14.1

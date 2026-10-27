@@ -44,7 +44,7 @@ Full list: `src/main/java/com/github/tatercertified/nalim/redstone/RustmiCommand
 ## Build
 
 ```bash
-tools/setup-toolchain.sh    # rustup targets, cargo-zigbuild, zig 0.14.1
+tools/setup-toolchain.sh    # pinned Rust toolchain + targets, cargo-zigbuild, zig 0.14.1
 ./gradlew build             # JAVA_HOME = JDK 25; jar: build/libs/rustmi-<version>.jar
 ```
 

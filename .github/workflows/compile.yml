@@ -18,11 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
+      - name: Rust toolchain
+        # Installs the channel, components and targets pinned in rust-toolchain.toml.
+        run: rustup toolchain install
+
       - name: Rust format
         run: cargo fmt --check --manifest-path native/Cargo.toml
-
-      - name: Rust targets
-        run: rustup target add aarch64-unknown-linux-gnu x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm x86_64-apple-darwin aarch64-apple-darwin
 
       - name: Setup Zig
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2

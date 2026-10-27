@@ -38,7 +38,7 @@ API. It runs on a ~35-player production server next to Fabrolia (`../Fabrolia`).
 The build and the harness need a Linux host (WSL2 works); the scripts use GNU tools.
 
 ```bash
-tools/setup-toolchain.sh                 # once: rustup targets, cargo-zigbuild, zig 0.14.1
+tools/setup-toolchain.sh                 # once: Rust from rust-toolchain.toml, cargo-zigbuild, zig 0.14.1
 export JAVA_HOME=/path/to/jdk-25
 ./gradlew build                          # jar: build/libs/rustmi-<version>.jar
 ```
