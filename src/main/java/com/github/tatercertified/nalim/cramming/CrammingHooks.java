@@ -210,13 +210,27 @@ public final class CrammingHooks {
     public static void onTickStart(MinecraftServer server) {
         CrammingEscapes.beginTick(enabled && runtimeEnabled);
         if (!enabled || !runtimeEnabled) return;
-        tryBindFabrolia();
-        // Region mode owns cramming: per-region batches are collected by the
-        // region workers themselves (RegionalCramming via RegionTickHooks).
-        // The global pre-phase would be pure waste — skip it. Checked every
-        // tick because /async regions is runtime-toggleable.
-        if (regionsLinked && RegionalCramming.regionsActive()) {
-            return;
+        try {
+            tryBindFabrolia();
+            // Region mode owns cramming: per-region batches are collected by the
+            // region workers themselves (RegionalCramming via RegionTickHooks).
+            // The global pre-phase would be pure waste — skip it. Checked every
+            // tick because /async regions is runtime-toggleable.
+            if (regionsLinked && RegionalCramming.regionsActive()) {
+                return;
+            }
+        } catch (Throwable t) {
+            // This runs at the head of tickServer: a Fabrolia API that differs at runtime
+            // must not take the server down. Fall back to the global, non-regional path.
+            LOGGER.error("Fabrolia probe failed at tick start; regional cramming disabled", t);
+            regionsLinked = false;
+            fabroliaExecutor = null;
+            pumpUntilDone = null;
+            try {
+                RegionalCramming.disable();
+            } catch (Throwable ignored) {
+                // RegionalCramming itself does not link: its hook can never have run
+            }
         }
         try {
             RustmiCramming c = RustmiCramming.get();

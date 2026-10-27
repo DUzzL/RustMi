@@ -123,35 +123,77 @@ public final class RegionalCramming implements RegionTickHooks.Hook {
         return null;
     }
 
+    /** Set when the tick-head Fabrolia probe failed: a still-registered hook does no work. */
+    private static volatile boolean disabled;
+
+    static void disable() {
+        disabled = true;
+    }
+
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Rustmi-Cramming");
+    private static final java.util.concurrent.atomic.AtomicLong LAST_FAILURE_LOG_MS =
+            new java.util.concurrent.atomic.AtomicLong();
+
     @Override
     public void preEntityTick(Region region) {
-        if (!CrammingHooks.isCrammingEnabled()) {
-            return;   // master switch off — no batches, mixin falls through
+        // Escape tracking is fixed at the tick head; a batch collected without it (cramming
+        // switched on mid-tick) could serve rows of entities that moved since.
+        if (disabled || !CrammingEscapes.tracking()) {
+            return;   // no batch: the mixin falls through to vanilla
         }
-        RegionBatch b = POOL.poll();
-        if (b == null) {
-            b = new RegionBatch();
+        RegionBatch b = null;
+        boolean sensorBegun = false;
+        try {
+            b = POOL.poll();
+            if (b == null) {
+                b = new RegionBatch();
+            }
+            b.collect(region);
+            if (b.size() == 0) {
+                b.clear();
+                POOL.add(b);
+                return;
+            }
+            b.runKernel();
+            b.sensorBegin();
+            sensorBegun = true;
+            // The volatile slot write releases the completed batch to serial and
+            // dense-fanout workers before any entity of this region can tick.
+            ACTIVE.publish(region.id, region, b);
+        } catch (Throwable t) {
+            // Fabrolia treats an exception from this hook as a fatal scheduler failure: run
+            // the region vanilla instead (no batch published, the possibly broken one dropped).
+            ACTIVE.remove(region.id, region);
+            if (sensorBegun) {
+                try {
+                    b.sensorEnd();
+                } catch (Throwable ignored) {
+                    // the batch is discarded anyway
+                }
+            }
+            logFailure("collect", t);
         }
-        b.collect(region);
-        if (b.size() == 0) {
-            b.clear();
-            POOL.add(b);
-            return;
-        }
-        b.runKernel();
-        b.sensorBegin();
-        // The volatile slot write releases the completed batch to serial and
-        // dense-fanout workers before any entity of this region can tick.
-        ACTIVE.publish(region.id, region, b);
     }
 
     @Override
     public void postEntityTick(Region region) {
         RegionBatch b = ACTIVE.remove(region.id, region);
         if (b != null) {
-            b.sensorEnd();   // before clear/grow can touch the retained buffer
-            b.clear();
-            POOL.add(b);
+            try {
+                b.sensorEnd();   // before clear/grow can touch the retained buffer
+                b.clear();
+                POOL.add(b);
+            } catch (Throwable t) {
+                logFailure("release", t);
+            }
+        }
+    }
+
+    private static void logFailure(String phase, Throwable t) {
+        long now = System.currentTimeMillis();
+        long last = LAST_FAILURE_LOG_MS.get();
+        if (now - last >= 1000 && LAST_FAILURE_LOG_MS.compareAndSet(last, now)) {
+            LOGGER.error("Regional cramming {} failed; this region runs vanilla", phase, t);
         }
     }
 
