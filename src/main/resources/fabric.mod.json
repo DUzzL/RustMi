@@ -8,7 +8,7 @@
   "contact": {},
   "license": "MIT",
   "icon": "assets/rustmi/icon.png",
-  "environment": "*",
+  "environment": "server",
   "entrypoints": {
     "mixinsquared": [
       "com.github.tatercertified.rustmi.compat.DebugifyMixinCanceller"
