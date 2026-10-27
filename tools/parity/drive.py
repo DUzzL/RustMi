@@ -233,6 +233,16 @@ def contraption():
     # (e) copper bulb at the end of line (b): it flips with flags 3 inside the cascade and
     # sends neighbor updates the wire script does not model
     c.append(f"setblock {x + 10} {y} {z + 15} minecraft:copper_bulb")
+    # (f) wire stepping DOWN over glass (a non-conductor: the down-diagonal read edges) into
+    # a 9-wire line, and a comparator reading a part-filled chest (power 1..14 into a line)
+    for i in range(3):
+        c.append(f"setblock {x + i} {y + 2 - i} {z + 17} minecraft:glass")
+        c.append(f"setblock {x + i} {y + 3 - i} {z + 17} minecraft:redstone_wire")
+    c.append(f"fill {x + 3} {y} {z + 17} {x + 11} {y} {z + 17} minecraft:redstone_wire")
+    c.append(f"setblock {x - 1} {y + 3} {z + 17} minecraft:redstone_block")
+    c.append(f"setblock {x + 26} {y} {z + 17} minecraft:chest{{Items:[{{Slot:0b,id:\"minecraft:stone\",count:64}},{{Slot:1b,id:\"minecraft:stone\",count:64}},{{Slot:2b,id:\"minecraft:stone\",count:64}}]}}")
+    c.append(f"setblock {x + 25} {y} {z + 17} minecraft:comparator[facing=east]")
+    c.append(f"fill {x + 24} {y} {z + 17} {x + 18} {y} {z + 17} minecraft:redstone_wire")
     # start the clock last (second observer completes the pair)
     c.append(f"setblock {x + 1} {y} {z + 1} minecraft:observer[facing=east]")
     c.append(f"setblock {x + 2} {y} {z + 1} minecraft:observer[facing=west]")
