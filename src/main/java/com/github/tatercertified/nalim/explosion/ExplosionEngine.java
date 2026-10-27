@@ -3,6 +3,7 @@ package com.github.tatercertified.nalim.explosion;
 import com.github.tatercertified.nalim.cramming.RustmiCramming;
 import com.github.tatercertified.nalim.rust.RustmiLib;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.core.BlockPos;
@@ -707,7 +708,7 @@ public final class ExplosionEngine {
                 // hot path: kernel already split the streams
                 List<BlockPos> nonAir = readTriples(u, b.outAddr, count);
                 commitKernelAirs(c, b);
-                return rebuildVanillaList(nonAir);
+                return rebuildList(c, nonAir);
             }
             List<BlockPos> discovery;
             if (count >= 0) {
@@ -716,7 +717,7 @@ public final class ExplosionEngine {
                 // committed — exact Java port with the same floats
                 return committedJavaSweep(c);
             }
-            return rebuildVanillaList(applySkipAir(c, b, discovery, true));
+            return rebuildList(c, applySkipAir(c, b, discovery, true));
         } catch (Throwable t) {
             engine = false;
             LOGGER.error("[explosion-engine] takeover failed — engine disabled for this session", t);
@@ -743,7 +744,7 @@ public final class ExplosionEngine {
         for (int i = 0; i < RAYS; i++) {
             floats[i] = u.getFloat(b.floatsAddr + (long) i * 4);
         }
-        return rebuildVanillaList(applySkipAir(c, b, javaSweep(c, b, floats), true));
+        return rebuildList(c, applySkipAir(c, b, javaSweep(c, b, floats), true));
     }
 
     /** Shadow path step 1: arm the float capture before vanilla runs. */
@@ -801,17 +802,15 @@ public final class ExplosionEngine {
             }
             int count = runKernel(c, b, c.skipAir != 0 ? 1 : 0);
             List<BlockPos> predicted = count >= 0
-                    ? rebuildVanillaList(readTriples(u, b.outAddr, count))
-                    : rebuildVanillaList(applySkipAir(c, b, javaSweep(c, b, c.capture), false));
+                    ? rebuildList(c, readTriples(u, b.outAddr, count))
+                    : rebuildList(c, applySkipAir(c, b, javaSweep(c, b, c.capture), false));
             if (predicted.equals(vanilla)) {
                 SHADOW_OK.incrementAndGet();
             } else if (predicted.size() == vanilla.size()
                     && new HashSet<>(predicted).equals(new HashSet<>(vanilla))) {
-                // Same destroyed SET, different order. Under Lithium this is EXPECTED,
-                // not a defect: lithium's block_raycast collects into a LongOpenHashSet
-                // and iterates THAT (its live baseline order), while our reconstruction
-                // reproduces pure-vanilla HashSet<BlockPos> iteration. Content parity is
-                // the certification gate; the engine's order is the MORE vanilla one.
+                // Same destroyed set, different order: the shuffle, drop and chain order
+                // would differ from the server without Rustmi (rebuildList reproduces
+                // vanilla's and Lithium's order), so the harness counts this as a failure.
                 SHADOW_ORDER_ONLY.incrementAndGet();
             } else {
                 SHADOW_BAD.incrementAndGet();
@@ -912,6 +911,40 @@ public final class ExplosionEngine {
         for (int i = 0; i < count; i++) {
             long base = addr + (long) i * 12;
             out.add(new BlockPos(u.getInt(base), u.getInt(base + 4), u.getInt(base + 8)));
+        }
+        return out;
+    }
+
+    /** Implemented by ServerExplosion when Lithium's block_raycast mixin is applied; null
+     *  without Lithium. */
+    private static final Class<?> LITHIUM_EXPLOSION = lithiumExplosionClass();
+
+    private static Class<?> lithiumExplosionClass() {
+        try {
+            return Class.forName("net.caffeinemc.mods.lithium.common.explosion.LithiumExplosion",
+                    false, ExplosionEngine.class.getClassLoader());
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * The list the server without Rustmi would produce. Lithium's block_raycast replaces
+     * vanilla's HashSet with {@code new LongOpenHashSet(0)}, adds the positions in the same
+     * discovery order and returns them in that set's iteration order (Lithium 0.26.2
+     * ServerExplosionMixin.collectBlocks); vanilla iterates a HashSet&lt;BlockPos&gt;.
+     */
+    private static List<BlockPos> rebuildList(Ctx c, List<BlockPos> discovery) {
+        if (LITHIUM_EXPLOSION == null || !LITHIUM_EXPLOSION.isInstance(c.explosion)) {
+            return rebuildVanillaList(discovery);
+        }
+        LongOpenHashSet set = new LongOpenHashSet(0);
+        for (BlockPos p : discovery) {
+            set.add(p.asLong());
+        }
+        List<BlockPos> out = new ObjectArrayList<>(set.size());
+        for (LongIterator it = set.iterator(); it.hasNext(); ) {
+            out.add(BlockPos.of(it.nextLong()));
         }
         return out;
     }

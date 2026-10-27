@@ -78,6 +78,7 @@ def main():
         if not r.get("explosion_engine_restored"):
             fails[f"{cfg}_explosion_engine_not_restored"] = 50
         fails[f"{cfg}_explosion_bad"] = es.get("bad", 0) + es.get("seenBad", 0)
+        fails[f"{cfg}_explosion_order"] = es.get("orderOnly", 0)
         cr = r.get("cramming_shadow", {})
         fails[f"{cfg}_cramming_set"] = cr.get("set", 0)
         fails[f"{cfg}_cramming_order"] = cr.get("order", 0)
