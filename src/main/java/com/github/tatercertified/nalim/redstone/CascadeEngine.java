@@ -328,6 +328,7 @@ public final class CascadeEngine {
         // max-chained-neighbor-updates the live drain drops updates the script expects.
         var server = level.getServer();
         if (server == null || server.getMaxChainedNeighborUpdates() != SIM_MAX_CHAINED_UPDATES) {
+            REJECT_LATCH.get()[0] = true;   // holds for every evaluation of this drain
             return false;
         }
         long t0 = System.nanoTime();
