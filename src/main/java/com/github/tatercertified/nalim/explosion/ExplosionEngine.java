@@ -734,7 +734,7 @@ public final class ExplosionEngine {
             // ── RNG commitment point: draw exactly like the vanilla loop ──
             Bufs b = BUFS.get();
             var u = RustmiCramming.theUnsafe();
-            drawFloats(c, u, b.floatsAddr, null);
+            drawFloats(c, u, b.floatsAddr);
             drawn = true;
             int kernelSkip = c.skipAir != 0 ? 1 : 0;
             int count = runKernel(c, b, kernelSkip);
@@ -876,7 +876,7 @@ public final class ExplosionEngine {
     }
 
     /** Vanilla's per-cell RNG draws, in exact loop order. */
-    private static void drawFloats(Ctx c, sun.misc.Unsafe u, long addr, float[] alsoInto) {
+    private static void drawFloats(Ctx c, sun.misc.Unsafe u, long addr) {
         var random = c.level.getRandom();
         int i = 0;
         for (int xx = 0; xx < 16; xx++) {
@@ -885,9 +885,6 @@ public final class ExplosionEngine {
                     if (xx == 0 || xx == 15 || yy == 0 || yy == 15 || zz == 0 || zz == 15) {
                         float f = random.nextFloat();
                         u.putFloat(addr + (long) i * 4, f);
-                        if (alsoInto != null) {
-                            alsoInto[i] = f;
-                        }
                         i++;
                     }
                 }

@@ -16,25 +16,20 @@ import one.nalim.Linker;
  */
 public final class NalimBindings {
     static {
+        // LoadRustBinary always publishes the extracted library's path before this runs.
         String nativePath = System.getProperty("rustmi.native.path");
-        if (nativePath == null) {
-            Linker.loadLibrary("rustmi");
-        } else {
-            if (nativePath.isBlank()) {
-                throw new IllegalStateException("rustmi.native.path must not be blank");
-            }
-            Linker.loadLibrary(nativePath);
+        if (nativePath == null || nativePath.isBlank()) {
+            throw new IllegalStateException("rustmi.native.path is not set (LoadRustBinary did not run)");
         }
+        Linker.loadLibrary(nativePath);
         Linker.linkClass(NalimBindings.class);
     }
 
     // ====================================================================
-    // Ferrite-style batched cramming kernel.
+    // Batched cramming kernel.
     //
     // Off-heap pointers (Java side passes ((DirectBuffer)buf).address())
-    // so GC cannot relocate the data during the call. Single Nalim @Link
-    // — no JNI handles, no thread state transition, ~1.4 ns wrapper
-    // overhead on top of the actual Rust spatial-hash kernel.
+    // so GC cannot relocate the data during the call.
     //
     // See com.github.tatercertified.nalim.cramming.RustmiCramming for
     // the higher-level controller and packing helpers.

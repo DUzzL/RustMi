@@ -16,7 +16,8 @@ use super::{sweep_packed, Bounds, PackedSnapshot, SectionDesc};
 ///   96..100 i32 air_count                (written by the kernel)
 ///
 /// `sections_ptr` → sec_nx*sec_ny*sec_nz SectionDesc (24 B each, y-major),
-/// `blob_ptr`/`blob_len` → palettes + raw storage longs + dense fills.
+/// `blob_ptr` → palettes + raw storage longs + dense fills; the readable length is derived
+/// from the section descriptors (the Java writer keeps every offset inside its buffer).
 ///
 /// Returns the non-air count (triples at out[0..n*3], discovery order).
 /// With skip_air=1 the distinct air cells are written BACKWARDS from the

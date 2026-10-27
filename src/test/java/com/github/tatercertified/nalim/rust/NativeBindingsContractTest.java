@@ -27,7 +27,7 @@ public final class NativeBindingsContractTest {
     private NativeBindingsContractTest() {}
 
     private static final Pattern PROTOTYPE =
-            Pattern.compile("([A-Za-z_][\\w ]*?\\**)\\s*\\b((?:oxi_|pack_)\\w+)\\(([^;{)]*)\\);");
+            Pattern.compile("([A-Za-z_][\\w ]*?\\**)\\s*\\b(oxi_\\w+)\\(([^;{)]*)\\);");
 
     public static void main(String[] args) throws Exception {
         Map<String, CFunction> header = parseHeader(Path.of(args[0]));

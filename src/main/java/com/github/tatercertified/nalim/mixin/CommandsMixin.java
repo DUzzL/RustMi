@@ -12,8 +12,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Registers /rustmi commands without a fabric-api dependency (the nalim
- * subproject deliberately has none). The Commands constructor runs at server
+ * Registers /rustmi commands without a fabric-api dependency (Rustmi does not
+ * require Fabric API). The Commands constructor runs at server
  * start and on /reload — both rebuild the dispatcher, so registering at
  * constructor RETURN keeps the command alive across datapack reloads.
  */

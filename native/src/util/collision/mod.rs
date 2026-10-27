@@ -339,16 +339,6 @@ pub(crate) fn collide_mixed_checked(
     }
 }
 
-pub fn collide_mixed(
-    movement: [f64; 3],
-    bb: Aabb,
-    step_height: f32,
-    on_ground: bool,
-    candidates: &[Collider<'_>],
-) -> [f64; 3] {
-    collide_mixed_checked(movement, bb, step_height, on_ground, candidates).movement
-}
-
 /// Cube/box-specialized calculateMaxOffset. Filtering remains fused into the
 /// per-axis scan, so the common path allocates nothing while preserving the
 /// candidate discovery order.
@@ -508,6 +498,8 @@ pub(crate) fn collide_checked(
     }
 }
 
+/// Test convenience: the kernel result without the epsilon flag.
+#[cfg(test)]
 pub fn collide(
     movement: [f64; 3],
     bb: Aabb,
