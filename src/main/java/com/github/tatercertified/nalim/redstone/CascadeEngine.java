@@ -125,7 +125,6 @@ public final class CascadeEngine {
         final Level level;
         final RedstoneWireBlock wire;
         final Map<BlockPos, CascadeRecorder.Node> network;
-        final Map<BlockPos, Integer> finalPower;
         final long outAddr;
         final int count;
         int cursor;
@@ -151,14 +150,13 @@ public final class CascadeEngine {
         final int x0, y0, z0, x1, y1, z1;
 
         Session(Level level, RedstoneWireBlock wire,
-                Map<BlockPos, CascadeRecorder.Node> network, Map<BlockPos, Integer> finalPower,
+                Map<BlockPos, CascadeRecorder.Node> network,
                 long outAddr, int count, int entryMode, int entryDrainDepth) {
             this.entryMode = entryMode;
             this.entryDrainDepth = entryDrainDepth;
             this.level = level;
             this.wire = wire;
             this.network = network;
-            this.finalPower = finalPower;
             this.outAddr = outAddr;
             this.count = count;
             int ax0 = Integer.MAX_VALUE, ay0 = Integer.MAX_VALUE, az0 = Integer.MAX_VALUE;
@@ -407,17 +405,7 @@ public final class CascadeEngine {
             }
         }
 
-        var u = RustmiCramming.theUnsafe();
-        Map<BlockPos, Integer> finalPower = new HashMap<>(network.size() * 2);
-        for (int i = 0; i < count; i++) {
-            long base = buf.outAddr + (long) i * EVENT_STRIDE;
-            if (u.getInt(base) == TAG_SET) {
-                finalPower.put(new BlockPos(u.getInt(base + 4), u.getInt(base + 8), u.getInt(base + 12)),
-                        u.getInt(base + 16));
-            }
-        }
-
-        Session s = new Session(level, wire, network, finalPower, buf.outAddr, count,
+        Session s = new Session(level, wire, network, buf.outAddr, count,
                 mode, DRAIN_DEPTH.get()[0]);
         SESSION.set(s);
         SETUP_NANOS.addAndGet(System.nanoTime() - t0);
@@ -467,7 +455,11 @@ public final class CascadeEngine {
         EVALS_SCRIPTED.incrementAndGet();
 
         BlockPos.MutableBlockPos cursorPos = new BlockPos.MutableBlockPos();
-        while (s.cursor < s.count && !s.aborted) {
+        // The span is one vanilla evaluator body (SET + its neighbor updates): once the EVAL
+        // marker matched it is emitted whole, as vanilla would, and a mismatch found inside
+        // it ends the script only after the span.
+        String spanMismatch = null;
+        while (s.cursor < s.count) {
             base = s.outAddr + (long) s.cursor * EVENT_STRIDE;
             tag = u.getInt(base);
             if (tag == TAG_EVAL) {
@@ -478,14 +470,15 @@ public final class CascadeEngine {
             if (tag == TAG_SET) {
                 int power = u.getInt(base + 16);
                 BlockPos p = cursorPos.set(x, y, z).immutable();
-                BlockState cur = s.level.getBlockState(p);
-                if (!cur.is(s.wire) || !cur.hasProperty(RedstoneWireBlock.POWER)) {
-                    abort(s, ABORT_MUTATION, "SET target no longer wire @ " + p.toShortString());
-                    return true;   // partial span emitted — vanilla must NOT rerun this eval
+                // Vanilla sets only when the evaluated state is still the live one
+                // (DefaultRedstoneWireEvaluator) and sends the updates either way.
+                if (!p.equals(pos) || s.level.getBlockState(p) != state) {
+                    spanMismatch = "SET target changed @ " + p.toShortString();
+                    continue;
                 }
                 s.emittingSet = true;
                 try {
-                    s.level.setBlock(p, cur.setValue(RedstoneWireBlock.POWER, power), 2);
+                    s.level.setBlock(p, state.setValue(RedstoneWireBlock.POWER, power), 2);
                 } finally {
                     s.emittingSet = false;
                 }
@@ -497,6 +490,9 @@ public final class CascadeEngine {
                 abort(s, ABORT_MISMATCH, "unknown tag " + tag);
                 return true;
             }
+        }
+        if (spanMismatch != null) {
+            abort(s, ABORT_MUTATION, spanMismatch);
         }
         return true;
     }
@@ -583,10 +579,7 @@ public final class CascadeEngine {
     }
 
     /**
-     * Stop the script, let vanilla evaluations resume, and re-derive every
-     * wire that has not reached its scripted final power. Re-derivation goes
-     * through the live collector in deterministic network order; wires already
-     * correct re-evaluate as no-ops.
+     * Stop the script and let vanilla evaluations resume from the current state.
      */
     private static void abort(Session s, AtomicLong counter, String why) {
         if (s.aborted) {
@@ -601,24 +594,9 @@ public final class CascadeEngine {
             break;   // one member is enough — entries are per-network
         }
         LOGGER.warn("[redstone-engine] abort: {} (cursor {}/{})", why, s.cursor, s.count);
-        if (s.cursor == 0) {
-            // Nothing was emitted: the world and the live collector are exactly vanilla's,
-            // and the evaluation that aborted runs vanilla. Re-derivation would only add
-            // neighborChanged calls vanilla never makes.
-            return;
-        }
-        for (Map.Entry<BlockPos, CascadeRecorder.Node> e : s.network.entrySet()) {
-            Integer want = s.finalPower.get(e.getKey());
-            if (want == null) {
-                continue;
-            }
-            BlockState cur = s.level.getBlockState(e.getKey());
-            int power = cur.is(s.wire) && cur.hasProperty(RedstoneWireBlock.POWER)
-                    ? cur.getValue(RedstoneWireBlock.POWER) : Integer.MIN_VALUE;
-            if (power != want) {
-                s.level.neighborChanged(e.getKey(), s.wire, null);
-            }
-        }
+        // No re-derivation: every emitted span was a complete evaluator body whose updates
+        // are already queued in the live collector, so vanilla continues from here and makes
+        // exactly the remaining dispatches. Extra neighborChanged calls would not be vanilla.
     }
 
     /** Rate-limit ABORT_LEFTOVER warns: 1 line/sec across the server (most
@@ -663,17 +641,8 @@ public final class CascadeEngine {
                         s.dispatchesAccepted, s.dispatchesBailed,
                         tagName, ex, ey, ez, expectedPower);
             }
-            // post-abort: re-derive wires not at scripted final power
-            for (Map.Entry<BlockPos, CascadeRecorder.Node> e : s.network.entrySet()) {
-                Integer want = s.finalPower.get(e.getKey());
-                if (want == null) continue;
-                BlockState cur = s.level.getBlockState(e.getKey());
-                int power = cur.is(s.wire) && cur.hasProperty(RedstoneWireBlock.POWER)
-                        ? cur.getValue(RedstoneWireBlock.POWER) : Integer.MIN_VALUE;
-                if (power != want) {
-                    s.level.neighborChanged(e.getKey(), s.wire, null);
-                }
-            }
+            // No re-derivation (see abort): the expected dispatches did not happen in the
+            // live drain, so vanilla would not have made those evaluations either.
         }
         SESSION.remove();
     }
