@@ -221,10 +221,12 @@ public final class CascadeEngine {
      * and the whole vanilla chain is skipped. ~68M suppressed evaluations per
      * session each paid that chain for nothing.
      *
-     * <p>Safe to skip canSurvive: a support-block change in the halo is a
-     * block-identity change — the mutation sentinel aborts the script before
-     * any such wire could be dispatched. Non-matching cases fall through to
-     * vanilla, where the evaluator-entry hook keeps the old validation path.
+     * <p>canSurvive is still checked: the mutation sentinel only covers support
+     * changes after the session started, while a support block removed earlier in
+     * the same drain leaves a floating wire in a freshly walked network. Vanilla
+     * removes that wire at this dispatch, so it takes the vanilla path. Non-matching
+     * cases fall through to vanilla, where the evaluator-entry hook keeps the old
+     * validation path.
      */
     public static boolean shortcutNeighborChanged(Level level, BlockPos pos, BlockState state) {
         if (!enabled) {
@@ -243,6 +245,10 @@ public final class CascadeEngine {
                 || u.getInt(base + 12) != pos.getZ()) {
             s.dispatchesBailed++;
             return false;   // not this wire's turn — vanilla path validates
+        }
+        if (!state.canSurvive(level, pos)) {
+            s.dispatchesBailed++;
+            return false;   // vanilla drops and removes the wire here
         }
         CascadeRecorder.poisonCurrentBurst();
         s.dispatchesAccepted++;
