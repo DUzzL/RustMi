@@ -30,7 +30,7 @@ import java.util.Properties;
 public final class NativeSections {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Rustmi-NativeSections");
-    private static final Path STATE_FILE = Paths.get("config", "rustmi", "native-sections.properties");
+    private static final Path STATE_FILE = com.github.tatercertified.nalim.RustmiPaths.config("rustmi", "native-sections.properties");
 
     private static volatile boolean enabled = loadPersisted();
     /** 0 = unprobed, 1 = native lib OK, -1 = probe failed (latched off). */

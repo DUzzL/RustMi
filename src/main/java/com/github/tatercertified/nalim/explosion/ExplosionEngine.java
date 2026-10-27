@@ -72,7 +72,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class ExplosionEngine {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Rustmi-Explosion");
-    private static final Path DIR = Paths.get("config", "rustmi");
+    private static final Path DIR = com.github.tatercertified.nalim.RustmiPaths.config("rustmi");
 
     private static final int RAYS = 1352;
     private static final int MAX_DIM = 64;

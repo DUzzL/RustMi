@@ -62,7 +62,7 @@ public final class CascadeEngine {
     private static final int EVENT_STRIDE = 20;
     private static final int TAG_EVAL = 0, TAG_SET = 1, TAG_UPD = 2;
 
-    private static final Path STATE_FILE = Paths.get("config", "rustmi", "redstone-engine.properties");
+    private static final Path STATE_FILE = com.github.tatercertified.nalim.RustmiPaths.config("rustmi", "redstone-engine.properties");
     private static volatile boolean enabled = CascadeRecorder.loadPersistedState(STATE_FILE, true);
 
     private static final AtomicLong HANDLES = new AtomicLong(0xE9617E);

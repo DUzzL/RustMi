@@ -50,7 +50,7 @@ public final class CrammingHooks {
 
     private static boolean loadRuntimeEnabled() {
         try {
-            java.nio.file.Path f = java.nio.file.Paths.get("config", "rustmi", "cramming.properties");
+            java.nio.file.Path f = com.github.tatercertified.nalim.RustmiPaths.config("rustmi", "cramming.properties");
             if (java.nio.file.Files.exists(f)) {
                 for (String line : java.nio.file.Files.readAllLines(f)) {
                     String t = line.trim();
@@ -72,7 +72,7 @@ public final class CrammingHooks {
     public static synchronized void setCrammingEnabled(boolean on) {
         runtimeEnabled = on;
         try {
-            java.nio.file.Path f = java.nio.file.Paths.get("config", "rustmi", "cramming.properties");
+            java.nio.file.Path f = com.github.tatercertified.nalim.RustmiPaths.config("rustmi", "cramming.properties");
             java.nio.file.Files.createDirectories(f.getParent());
             java.nio.file.Files.write(f, ("# Rustmi cramming master switch\nenabled=" + on + "\n")
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -118,7 +118,7 @@ public final class CrammingHooks {
         // (or missing file) means we proceed. Read the config JSON directly —
         // checking "mod is loaded" produced a false positive.
         try {
-            java.nio.file.Path cfg = java.nio.file.Paths.get("config", "sepals.json");
+            java.nio.file.Path cfg = com.github.tatercertified.nalim.RustmiPaths.config("sepals.json");
             if (java.nio.file.Files.exists(cfg)) {
                 String json = java.nio.file.Files.readString(cfg);
                 int idx = json.indexOf("\"enableSepalsEntitiesCramming\"");

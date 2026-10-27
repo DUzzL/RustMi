@@ -313,7 +313,7 @@ public final class CollisionEngine {
 
     // ── persist (same pattern as ExplosionEngine) ────────────────────────
 
-    private static final Path PERSIST_DIR = Paths.get("config", "rustmi-runtime");
+    private static final Path PERSIST_DIR = com.github.tatercertified.nalim.RustmiPaths.config("rustmi-runtime");
 
     /** Optimizations default ON for fresh installs (user directive 2026-06-12);
      *  a persisted flag, once written by a toggle command, always wins. */

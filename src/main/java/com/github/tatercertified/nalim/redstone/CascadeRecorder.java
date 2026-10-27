@@ -62,8 +62,8 @@ public final class CascadeRecorder {
     private static final int MAX_EVENTS = 200_000;
 
     // Read once at startup; see the class javadoc.
-    private static final Path STATE_FILE = Paths.get("config", "rustmi", "redstone-recorder.properties");
-    private static final Path SHADOW_STATE_FILE = Paths.get("config", "rustmi", "redstone-shadow.properties");
+    private static final Path STATE_FILE = com.github.tatercertified.nalim.RustmiPaths.config("rustmi", "redstone-recorder.properties");
+    private static final Path SHADOW_STATE_FILE = com.github.tatercertified.nalim.RustmiPaths.config("rustmi", "redstone-shadow.properties");
     private static volatile boolean enabled = loadPersisted(STATE_FILE);
     /** R2 shadow engine: capture bursts and diff them against the Rust sim. */
     private static volatile boolean shadowEnabled = loadPersisted(SHADOW_STATE_FILE);
