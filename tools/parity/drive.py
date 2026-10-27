@@ -216,6 +216,12 @@ def contraption():
     c.append(f"setblock {x + 23} {y} {z + 12} minecraft:redstone_lamp")
     c.append(f"setblock {x + 15} {y} {z + 13} minecraft:comparator[facing=north,mode=subtract]")
     c.append(f"fill {x + 15} {y} {z + 14} {x + 15} {y} {z + 16} minecraft:redstone_wire")
+    # (d) 9-wire line climbing onto a conductor (staircase top at y+1), fed by a redstone
+    # block placed after the wires, so the network is cached; deterministic_part breaks it
+    c.append(f"fill {x + 20} {y} {z + 15} {x + 28} {y} {z + 15} minecraft:redstone_wire")
+    c.append(f"setblock {x + 29} {y} {z + 15} minecraft:stone")
+    c.append(f"setblock {x + 29} {y + 1} {z + 15} minecraft:redstone_wire")
+    c.append(f"setblock {x + 19} {y} {z + 15} minecraft:redstone_block")
     # start the clock last (second observer completes the pair)
     c.append(f"setblock {x + 1} {y} {z + 1} minecraft:observer[facing=east]")
     c.append(f"setblock {x + 2} {y} {z + 1} minecraft:observer[facing=west]")
@@ -251,6 +257,15 @@ def deterministic_part(s, outdir, res):
             raise TimeoutError("tick step did not complete")
         time.sleep(0.2)
     res["steps_done"] = s.gametime() - g0
+    # (d) break the wire under the staircase top: the top's only feed goes away inside
+    # setBlockState (affectNeighborsAfterRemoval), while the network is still cached.
+    s.cmd(f"setblock {OX + 28} {OY} {OZ + 15} minecraft:air destroy")
+    g1 = s.gametime()
+    s.cmd("tick step 10")
+    while s.gametime() < g1 + 10:
+        if time.time() > deadline + 60:
+            raise TimeoutError("tick step after the wire break did not complete")
+        time.sleep(0.2)
     save(s)
     snapshot_region(os.path.join(outdir, "rs"))
     s.cmd("tick rate 20")

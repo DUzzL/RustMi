@@ -190,6 +190,19 @@ public abstract class LevelChunkMirrorMixin implements CubeMirror {
         }
     }
 
+    /**
+     * R3 pre-write sentinel: vanilla runs {@code affectNeighborsAfterRemoval} and {@code onPlace}
+     * (neighbor drains, wire evaluations) inside setBlockState, before the RETURN hook below.
+     * Cached wire networks whose topology this write changes must be gone before those run.
+     */
+    @Inject(method = "setBlockState(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;I)Lnet/minecraft/world/level/block/state/BlockState;",
+            at = @At("HEAD"))
+    private void oxi$beforeWrite(BlockPos pos, BlockState state, int flags,
+                                 CallbackInfoReturnable<BlockState> cir) {
+        com.github.tatercertified.nalim.redstone.CascadeEngine.onWorldSetBlockHead(
+                (LevelChunk) (Object) this, pos, state);
+    }
+
     @Inject(method = "setBlockState(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;I)Lnet/minecraft/world/level/block/state/BlockState;",
             at = @At("RETURN"))
     private void oxi$invalidateCell(BlockPos pos, BlockState state, int flags,

@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.RedstoneWireBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,6 +131,9 @@ public final class CascadeEngine {
         int cursor;
         boolean aborted;
         boolean emittingSet;
+        /** A foreign topology write in the halo has started (HEAD of setBlockState) and
+         *  its side effects are running; evaluations go vanilla until its RETURN aborts. */
+        boolean foreignWrite;
         /** The takeover's own emission frame is on the stack: a depth-0 entry
          *  drains each emitted UPD synchronously (depth 1→0 between UPDs),
          *  and those transient exits must not end the session. */
@@ -225,7 +229,7 @@ public final class CascadeEngine {
             return false;
         }
         Session s = SESSION.get();
-        if (s == null || s.aborted || s.level != level || s.cursor >= s.count
+        if (s == null || s.aborted || s.foreignWrite || s.level != level || s.cursor >= s.count
                 || !s.network.containsKey(pos)) {
             return false;
         }
@@ -265,7 +269,7 @@ public final class CascadeEngine {
                                             CascadeRecorder.BlockSignalReader signals) {
         Session s = SESSION.get();
         if (s != null) {
-            if (s.aborted || s.level != level) {
+            if (s.aborted || s.foreignWrite || s.level != level) {
                 return false;          // vanilla finishes the cascade
             }
             if (!s.network.containsKey(pos)) {
@@ -307,6 +311,11 @@ public final class CascadeEngine {
     private static boolean tryTakeover(Level level, BlockPos pos, BlockState state,
                                        RedstoneWireBlock wire,
                                        CascadeRecorder.BlockSignalReader signals) {
+        // The removal path evaluates the wire with its old state after the block is gone
+        // (affectNeighborsAfterRemoval); the network model cannot describe that position.
+        if (level.getBlockState(pos) != state) {
+            return false;
+        }
         long t0 = System.nanoTime();
         NetworkCache.Cached cached = NetworkCache.lookup(level, pos, signals);
         Map<BlockPos, CascadeRecorder.Node> network;
@@ -512,6 +521,42 @@ public final class CascadeEngine {
         }
         abort(s, ABORT_MUTATION, "foreign setBlock " + oldState.getBlock().getDescriptionId()
                 + "→" + newState.getBlock().getDescriptionId() + " @ " + pos.toShortString());
+    }
+
+    /**
+     * LevelChunk.setBlockState HEAD — before the section write and before the
+     * removal/placement side effects ({@code affectNeighborsAfterRemoval},
+     * {@code onPlace}) that run neighbor drains and wire evaluations inside the
+     * same call. A write that changes a block's identity or conductor status
+     * drops the cached networks it touches now, so those evaluations re-walk the
+     * live world, and stops a running script in its halo from emitting until the
+     * RETURN sentinel aborts it.
+     */
+    public static void onWorldSetBlockHead(LevelChunk chunk, BlockPos pos, BlockState newState) {
+        if (!enabled) {
+            return;
+        }
+        Level level = chunk.getLevel();
+        if (level.isClientSide()) {
+            return;
+        }
+        Session s = SESSION.get();
+        boolean inSession = s != null && !s.aborted && !s.emittingSet && s.level == level && s.inHalo(pos);
+        if (!inSession && !NetworkCache.hasEntries()) {
+            return;
+        }
+        BlockState oldState = chunk.getBlockState(pos);
+        if (oldState == newState) {
+            return;
+        }
+        if (oldState.getBlock() == newState.getBlock()
+                && !NetworkCache.conductorChanged(level, pos, oldState, newState)) {
+            return;   // value-only change — the RETURN sentinel keeps cached values live
+        }
+        NetworkCache.onTopologyWriteStart(level, pos, oldState, newState);
+        if (inSession) {
+            s.foreignWrite = true;
+        }
     }
 
     /**

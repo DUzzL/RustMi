@@ -292,6 +292,25 @@ final class NetworkCache {
         applySetBlockOnMain(level, pos, oldState, newState, wireOnlyPowerChange, newPower);
     }
 
+    static boolean hasEntries() {
+        return ALL_COUNT > 0;
+    }
+
+    /**
+     * A topology-changing write is about to happen (setBlockState HEAD, before its
+     * removal/placement side effects run). Drops the entries it touches right away;
+     * the RETURN sentinel ({@link #onSetBlock}) repeats the drop for anything cached
+     * in between. Worker-side writes are left to that RETURN event: lookups only
+     * happen on the main thread.
+     */
+    static void onTopologyWriteStart(Level level, BlockPos pos, BlockState oldState, BlockState newState) {
+        if (!onMain(level)) {
+            return;
+        }
+        drainOffMainEvents();
+        applySetBlockOnMain(level, pos, oldState, newState, false, -1);
+    }
+
     /**
      * Vanilla is about to evaluate the wire at {@code pos} (no takeover). If it is a
      * cached member, its strong power may have changed without any block write
