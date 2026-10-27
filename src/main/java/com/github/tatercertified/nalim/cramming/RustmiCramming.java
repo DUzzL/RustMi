@@ -228,6 +228,7 @@ public final class RustmiCramming implements CandidateBatch {
     public void beginCollect() {
         nextSlot.set(0);
         vanillaOrdered = true;
+        originSlots.clear();   // no origin of an earlier (failed) collect may survive into this one
     }
 
     /** More rows were offered than the buffers hold this tick. */

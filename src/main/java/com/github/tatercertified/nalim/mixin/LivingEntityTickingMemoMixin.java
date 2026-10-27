@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ChunkPos;
+import com.moulberry.mixinconstraints.annotations.IfModAbsent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,6 +19,7 @@ import org.spongepowered.asm.mixin.injection.At;
  * {@link TickingMemo}; one immutable record behind a volatile field. Under the collision
  * shadow a memo hit is checked against vanilla.
  */
+@IfModAbsent("fabrolia")
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityTickingMemoMixin {
 
@@ -30,16 +32,10 @@ public abstract class LivingEntityTickingMemoMixin {
      * (0.4.2-alpha.0.41, checked by bytecode) only reads chunkVisibility and the simulation
      * map and changes levels through setLevel, so it needs no gate.
      */
-    @Unique private static final boolean RUSTMI$MEMO_ENABLED =
-            !net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("fabrolia");
-
     @WrapOperation(method = "isPushable",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/server/level/ServerLevel;isPositionEntityTicking(Lnet/minecraft/core/BlockPos;)Z"))
     private boolean rustmi$memoTicking(ServerLevel level, BlockPos pos, Operation<Boolean> original) {
-        if (!RUSTMI$MEMO_ENABLED) {
-            return original.call(level, pos);
-        }
         long epoch = TickingMemo.currentEpoch();
         long chunk = ChunkPos.pack(pos);
         TickingMemo memo = rustmi$tickingMemo;

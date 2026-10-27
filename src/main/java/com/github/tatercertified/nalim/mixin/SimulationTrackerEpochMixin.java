@@ -4,6 +4,7 @@ import com.github.tatercertified.nalim.entity.TickingMemo;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.minecraft.server.level.SimulationChunkTracker;
+import com.moulberry.mixinconstraints.annotations.IfModAbsent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -14,6 +15,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * {@code setLevel}; Fabrolia republishes its completed view of them at the RETURN of
  * {@code runAllUpdates}, so the outermost wrap bumps again after that publication.
  */
+// Only the ticking memo reads this epoch, and it is not applied with Fabrolia.
+@IfModAbsent("fabrolia")
 @Mixin(SimulationChunkTracker.class)
 public abstract class SimulationTrackerEpochMixin {
 

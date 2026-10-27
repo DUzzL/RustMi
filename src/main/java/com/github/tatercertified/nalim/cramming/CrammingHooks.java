@@ -64,8 +64,9 @@ public final class CrammingHooks {
         return true;   // default ON — the shipped behaviour
     }
 
+    /** Runtime toggle AND not yielded to Sepals' cramming (which sets {@code enabled=false}). */
     public static boolean isCrammingEnabled() {
-        return runtimeEnabled;
+        return enabled && runtimeEnabled;
     }
 
     public static synchronized void setCrammingEnabled(boolean on) {
@@ -263,6 +264,7 @@ public final class CrammingHooks {
             // candidates for every origin. Run this tick fully vanilla; endTick grows.
             if (c.overCapacity()) {
                 c.dropOrigins();
+                return;   // nothing to compute: every query of this tick runs vanilla
             }
             c.runBatch();
             c.retainForQueries();
