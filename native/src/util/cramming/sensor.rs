@@ -187,18 +187,22 @@ fn batch_query(handle: u64, slot: usize, range: f64, pad: f64, mask: i32, out: &
             count += 1;
         };
 
-        if me_half > GRID_MAX_HALF {
-            // A huge origin spans many coarse cells; a linear row scan avoids
-            // hundreds of thousands of empty HashMap probes.
+        // Grid rows are bounded by GRID_MAX_HALF. Oversized candidates
+        // are not part of this reach calculation and are visited once
+        // through the side list below.
+        let reach = range + me_half + index.max_grid_half + pad;
+        let cells = (reach / COARSE_CELL).ceil() as i32;
+        let side = 2 * cells as i64 + 1;
+        if me_half > GRID_MAX_HALF
+            || side.saturating_mul(side).saturating_mul(side) > inputs.len() as i64
+        {
+            // A huge origin or a long sensor range spans more coarse cells than there
+            // are rows: a linear row scan visits the same rows (visit is the exact
+            // filter) without hundreds of thousands of empty HashMap probes.
             for j in 0..inputs.len() as u32 {
                 visit(j);
             }
         } else {
-            // Grid rows are bounded by GRID_MAX_HALF. Oversized candidates
-            // are not part of this reach calculation and are visited once
-            // through the side list below.
-            let reach = range + me_half + index.max_grid_half + pad;
-            let cells = (reach / COARSE_CELL).ceil() as i32;
             let cx = coarse_cell(me.pos[0]);
             let cy = coarse_cell(me.pos[1]);
             let cz = coarse_cell(me.pos[2]);
