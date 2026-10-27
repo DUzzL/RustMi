@@ -78,6 +78,12 @@ def main():
         cs = r.get("collision_shadow", {})
         fails[f"{cfg}_collision_bad"] = cs.get("bad", 0)
         es = r.get("explosion_shadow", {})
+        et = r.get("explosion_takeover")
+        if not et or not et["takeovers"] or not et["fieldChanged"] or not et["deterministic"]:
+            fails[f"{cfg}_explosion_takeover_vacuous"] = 50
+            asi[f"{cfg}_explosion_takeover"] = et
+        elif not et["sameAsVanilla"]:
+            fails[f"{cfg}_explosion_takeover_differs"] = 50
         if not r.get("explosion_engine_restored"):
             fails[f"{cfg}_explosion_engine_not_restored"] = 50
         fails[f"{cfg}_explosion_bad"] = es.get("bad", 0) + es.get("seenBad", 0)

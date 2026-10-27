@@ -385,6 +385,46 @@ def collider_window_scenarios(s, x, y, z):
         s.cmd(f"summon minecraft:{kind} {x - 10 + 3 * i} {y + 1} {z + 14} {{PersistenceRequired:1b}}")
 
 
+def explosion_field(s, x0, y0, z0):
+    """13x13x13 block of mixed resistances with an empty cell in the middle."""
+    x1, y1, z1 = x0 + 12, y0 + 12, z0 + 12
+    s.cmd(f"fill {x0} {y0} {z0} {x1} {y1} {z1} minecraft:stone")
+    s.cmd(f"fill {x0} {y0 + 3} {z0} {x1} {y0 + 4} {z1} minecraft:dirt")
+    s.cmd(f"fill {x0 + 2} {y0 + 6} {z0} {x0 + 4} {y0 + 8} {z1} minecraft:oak_planks")
+    s.cmd(f"fill {x0 + 8} {y0 + 5} {z0 + 2} {x0 + 9} {y0 + 9} {z0 + 10} minecraft:obsidian")
+    s.cmd(f"fill {x0} {y0 + 10} {z0} {x1} {y0 + 10} {z1} minecraft:glass")
+    s.cmd(f"fill {x0 + 5} {y0 + 5} {z0 + 5} {x0 + 7} {y0 + 7} {z0 + 7} minecraft:air")
+    # TNT in reach: primed in the exploded-block order with fuses drawn from the level RNG,
+    # so a wrong list order shows up in the chain's craters, not only in drops.
+    for dx, dz in ((3, 6), (9, 6), (6, 9), (6, 2)):
+        s.cmd(f"setblock {x0 + dx} {y0 + 6} {z0 + dz} minecraft:tnt")
+
+
+def explosion_takeover_check(s, res):
+    """The takeover against vanilla: identical fields, every explosion seeded with the same
+    level RNG seed (/rustmi test explosionseed, -Drustmi.test=true). A and D run with the
+    engine off (D proves the test itself is deterministic), B with it on; C stays untouched
+    to prove the explosions changed something."""
+    y0, z0 = 236, 1060
+    xa, xd, xb, xc = 960, 980, 1000, 1020
+    for x0 in (xa, xd, xb, xc):
+        explosion_field(s, x0, y0, z0)
+    s.cmd("rustmi test explosionseed 4242")
+    for x0, engine in ((xa, "off"), (xd, "off"), (xb, "on")):
+        s.cmd(f"rustmi explosion {engine}")
+        s.cmd(f"summon tnt {x0 + 6.5} {y0 + 6} {z0 + 6.5} {{fuse:0}}")
+        s.ask("tick sprint 100", r"Sprint completed", 120)
+    s.cmd("rustmi test explosionseed off")
+    m = s.ask("rustmi explosion status", r"takeovers=(\d+)")
+
+    def same(x):
+        span = f"{xa} {y0} {z0} {xa + 12} {y0 + 12} {z0 + 12}"
+        return s.ask(f"execute if blocks {span} {x} {y0} {z0} all", r"Test (passed|failed)").group(1) == "passed"
+
+    res["explosion_takeover"] = {"takeovers": int(m.group(1)), "deterministic": same(xd),
+                                 "sameAsVanilla": same(xb), "fieldChanged": not same(xc)}
+
+
 def rustmi_scenario(s, res):
     """Shadow counters + perf/RAM workload (rustmi configs only)."""
     s.cmd("tick unfreeze")
@@ -499,6 +539,7 @@ def rustmi_scenario(s, res):
     m = s.ask("rustmi explosion status", r"shadow=(\S+) engine=(\S+)")
     res["explosion_engine_restored"] = m.group(1) == "false" and m.group(2) == "true"
     s.cmd("rustmi explosion on")
+    explosion_takeover_check(s, res)
     for (px, pz) in ((962, 1010), (966, 1010), (970, 1010), (962, 1016)):
         s.cmd(f"fill {px - 1} {y} {pz - 1} {px + 1} {y + 3} {pz + 1} minecraft:glass hollow")
         for i in range(75):

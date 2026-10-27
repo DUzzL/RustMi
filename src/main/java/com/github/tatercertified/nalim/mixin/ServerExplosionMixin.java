@@ -35,6 +35,9 @@ public abstract class ServerExplosionMixin {
      *  getSeenPercent of the same explosion, cleared on exit. */
     @WrapMethod(method = "explode")
     private int rustmi$explosionContext(Operation<Integer> original) {
+        if (com.github.tatercertified.nalim.TestHooks.ENABLED) {
+            com.github.tatercertified.nalim.TestHooks.beforeExplosion(this.level);
+        }
         if (!ExplosionEngine.isEngine() && !ExplosionEngine.isShadow()) {
             return original.call();
         }

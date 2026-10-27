@@ -42,7 +42,22 @@ public final class RustmiCommands {
     private RustmiCommands() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("rustmi")
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("rustmi");
+        if (com.github.tatercertified.nalim.TestHooks.ENABLED) {
+            // Harness-only (-Drustmi.test=true): seed the level RNG at every explosion start.
+            root.then(adminLiteral("test").then(Commands.literal("explosionseed")
+                    .then(Commands.literal("off").executes(ctx -> {
+                        com.github.tatercertified.nalim.TestHooks.disarmExplosionSeed();
+                        return sendLine(ctx, "explosion seed off");
+                    }))
+                    .then(Commands.argument("seed", com.mojang.brigadier.arguments.LongArgumentType.longArg())
+                            .executes(ctx -> {
+                                long seed = com.mojang.brigadier.arguments.LongArgumentType.getLong(ctx, "seed");
+                                com.github.tatercertified.nalim.TestHooks.armExplosionSeed(seed);
+                                return sendLine(ctx, "explosion seed " + seed);
+                            }))));
+        }
+        dispatcher.register(root
                 .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(statsCommand())
                 .then(toggleCommand("cramming",

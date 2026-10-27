@@ -53,7 +53,7 @@ for ref in V L; do
 done
 for backend in $BACKENDS; do
     for cfg in R LR; do
-        RUSTMI_EXTRA_JVM="-Drustmi.backend=$backend $USER_JVM" \
+        RUSTMI_EXTRA_JVM="-Drustmi.backend=$backend -Drustmi.test=true $USER_JVM" \
             python3 drive.py "$cfg" "$STAND/runs/$cfg-$backend" > "$STAND/logs/$cfg-$backend.log" 2>&1
     done
 done
