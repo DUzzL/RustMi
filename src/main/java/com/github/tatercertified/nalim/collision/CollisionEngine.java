@@ -225,6 +225,11 @@ public final class CollisionEngine {
     private static final double COORD_LIMIT = 1.0E9;
 
     public static int classify(BlockState s) {
+        if (s == null) {
+            // A palette slot read while another thread resizes the container (Fabrolia
+            // regions): unknown cell, so every query touching it runs vanilla.
+            return CLS_PARTIAL;
+        }
         Byte cached = STATE_CLS.get(s);
         if (cached != null) {
             return cached;
