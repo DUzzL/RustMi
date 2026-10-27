@@ -75,6 +75,8 @@ def main():
         cs = r.get("collision_shadow", {})
         fails[f"{cfg}_collision_bad"] = cs.get("bad", 0)
         es = r.get("explosion_shadow", {})
+        if not r.get("explosion_engine_restored"):
+            fails[f"{cfg}_explosion_engine_not_restored"] = 50
         fails[f"{cfg}_explosion_bad"] = es.get("bad", 0) + es.get("seenBad", 0)
         cr = r.get("cramming_shadow", {})
         fails[f"{cfg}_cramming_set"] = cr.get("set", 0)

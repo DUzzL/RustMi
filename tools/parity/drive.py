@@ -486,6 +486,9 @@ def rustmi_scenario(s, res):
     s.cmd("rustmi collisionshadow off")
     s.cmd("rustmi collision on")
     s.cmd("rustmi explosion shadow off")
+    # Ending a shadow session must restore the engine it switched off.
+    m = s.ask("rustmi explosion status", r"shadow=(\S+) engine=(\S+)")
+    res["explosion_engine_restored"] = m.group(1) == "false" and m.group(2) == "true"
     s.cmd("rustmi explosion on")
     for (px, pz) in ((962, 1010), (966, 1010), (970, 1010), (962, 1016)):
         s.cmd(f"fill {px - 1} {y} {pz - 1} {px + 1} {y + 3} {pz + 1} minecraft:glass hollow")

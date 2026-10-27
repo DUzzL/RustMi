@@ -305,10 +305,6 @@ public final class CollisionEngine {
 
     private static final Path PERSIST_DIR = Paths.get("config", "rustmi-runtime");
 
-    private static boolean loadPersisted(String name) {
-        return loadPersisted(name, false);
-    }
-
     /** Optimizations default ON for fresh installs (user directive 2026-06-12);
      *  a persisted flag, once written by a toggle command, always wins. */
     private static boolean loadPersisted(String name, boolean def) {
@@ -334,8 +330,12 @@ public final class CollisionEngine {
 
     // ── toggles + stats ──────────────────────────────────────────────────
 
-    private static volatile boolean shadow = loadPersisted("collision-shadow");
+    /** Not persisted: a shadow session is a temporary measurement and never survives a
+     *  restart (an old collision-shadow.flag is ignored). */
+    private static volatile boolean shadow = false;
     private static volatile boolean engine = loadPersisted("collision-engine", true);
+    /** Engine state to restore when the running shadow session ends; null = none pending. */
+    private static Boolean engineAfterShadow;
 
     private static final class Stats {
         volatile long epoch = Long.MIN_VALUE;
@@ -376,21 +376,26 @@ public final class CollisionEngine {
         return engine || shadow;
     }
 
+    /** Shadow on turns the engine off for the session only; shadow off restores it. */
     public static synchronized void setShadow(boolean on) {
         if (on) {
             resetStats();
+            if (engineAfterShadow == null) {
+                engineAfterShadow = engine;
+            }
             engine = false;
-            persist("collision-engine", false);
+        } else if (engineAfterShadow != null) {
+            engine = engineAfterShadow;
+            engineAfterShadow = null;
         }
         shadow = on;
-        persist("collision-shadow", on);
     }
 
     public static synchronized void setEngine(boolean on) {
+        engineAfterShadow = null;
         if (on) {
             resetStats();
             shadow = false;
-            persist("collision-shadow", false);
         }
         engine = on;
         persist("collision-engine", on);

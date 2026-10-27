@@ -78,9 +78,13 @@ public final class ExplosionEngine {
     private static final int OUT_CAP = 32768;
     private static final float MAX_RADIUS = 12.0f;
 
-    private static volatile boolean shadow = loadPersisted("explosion-shadow");
-    private static volatile boolean engine =
-            !shadow && loadPersisted("explosion-engine", true);
+    /** Not persisted: a shadow session is a temporary measurement and never survives a
+     *  restart (an old explosion-shadow file is ignored). */
+    private static volatile boolean shadow = false;
+    private static volatile boolean engine = loadPersisted("explosion-engine", true);
+    /** Engine state to restore when the running shadow session ends; null = none pending
+     *  (also cleared when the engine disabled itself after a failure). */
+    private static Boolean engineAfterShadow;
     /** E2 seen-percent fast path — the DAMAGE path, so it stays OFF until its shadow
      *  divergence (117/7230 mismatches, 2026-07-02 storm) is root-caused to bit-exact.
      *  E1 (sweep) does not depend on it: engine mode with seenFast=false runs the
@@ -120,21 +124,26 @@ public final class ExplosionEngine {
     public static boolean isShadow() { return shadow; }
     public static boolean isEngine() { return engine; }
 
+    /** Shadow on turns the engine off for the session only; shadow off restores it. */
     public static synchronized void setShadow(boolean on) {
         if (on) {
             resetStats();
+            if (engineAfterShadow == null) {
+                engineAfterShadow = engine;
+            }
             engine = false;
-            persist("explosion-engine", false);
+        } else if (engineAfterShadow != null) {
+            engine = engineAfterShadow;
+            engineAfterShadow = null;
         }
         shadow = on;
-        persist("explosion-shadow", on);
     }
 
     public static synchronized void setEngine(boolean on) {
+        engineAfterShadow = null;
         if (on) {
             resetStats();
             shadow = false;
-            persist("explosion-shadow", false);
         }
         engine = on;
         persist("explosion-engine", on);
@@ -1015,6 +1024,7 @@ public final class ExplosionEngine {
         } catch (Throwable t) {
             engine = false;
             shadow = false;
+            engineAfterShadow = null;   // a failed engine must not come back with "shadow off"
             LOGGER.error("[explosion] seenPercent failed — engine+shadow disabled", t);
             return original.call(center, entity);
         }
@@ -1195,10 +1205,6 @@ public final class ExplosionEngine {
     // ─────────────────────────────────────────────────────────────────────
     // Persistence
     // ─────────────────────────────────────────────────────────────────────
-
-    private static boolean loadPersisted(String name) {
-        return loadPersisted(name, false);
-    }
 
     /** Optimizations default ON for fresh installs (user directive 2026-06-12);
      *  the persisted file, once written by a toggle command, always wins. */
