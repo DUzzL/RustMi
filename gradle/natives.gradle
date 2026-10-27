@@ -17,8 +17,19 @@ def nativeTargets = [
         'librustmi_mac_arm64.dylib': [target: 'aarch64-apple-darwin', dir: 'aarch64-apple-darwin', file: 'librustmi.dylib'],
 ]
 
-def zigBinary = System.getenv('ZIG') ?: new File(System.getProperty('user.home'), '.local/opt/zig-0.14.1/zig').with {
-    it.canExecute() ? it.absolutePath : null
+def zigEnv = System.getenv('ZIG')
+def zigBinary
+if (zigEnv) {
+    // A bare name (ZIG=zig) has no parent directory to put on PATH below.
+    def zigFile = new File(zigEnv)
+    if (!zigFile.isAbsolute() || !zigFile.canExecute()) {
+        throw new GradleException("ZIG=${zigEnv} must be the absolute path of an executable zig")
+    }
+    zigBinary = zigFile.absolutePath
+} else {
+    zigBinary = new File(System.getProperty('user.home'), '.local/opt/zig-0.14.1/zig').with {
+        it.canExecute() ? it.absolutePath : null
+    }
 }
 def nativeSources = [file('native/src'), file('native/Cargo.toml'), file('native/Cargo.lock'), file('native/build.rs')]
 // A toolchain change must rebuild the libraries too, not only a source change.
@@ -36,6 +47,9 @@ def cargoTasks = nativeTargets.collect { packaged, spec ->
         if (zigBinary != null) {
             environment 'PATH', new File(zigBinary).parentFile.absolutePath + File.pathSeparator + System.getenv('PATH')
         }
+        // Ambient RUSTFLAGS / ~/.cargo/config.toml rustflags must not change the shipped
+        // libraries: an empty CARGO_ENCODED_RUSTFLAGS takes precedence over both.
+        environment 'CARGO_ENCODED_RUSTFLAGS', ''
         // zig cc turns mimalloc's __DATE__ use into an error; the date is cosmetic there.
         environment "CFLAGS_${spec.dir.replace('-', '_')}", '-Wno-error=date-time -Wno-date-time'
         // Rust's own minimum for Apple Silicon; zig would otherwise stamp its host default.

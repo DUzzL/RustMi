@@ -136,6 +136,7 @@ tasks.register('cargoTest', Exec) {
     group = 'verification'
     description = 'Runs cargo test for native/.'
     workingDir 'native'
+    environment 'CARGO_ENCODED_RUSTFLAGS', ''
     // Release speed for the fixtures, but with overflow checks and std's debug assertions
     // (slice/pointer preconditions) on: the shipped profile wraps and skips them silently.
     commandLine 'cargo', 'test', '--release', '--locked',

@@ -16,7 +16,7 @@ parking_lot = "0.12.5"
 mimalloc = {git = "https://github.com/ralfbiedert/mimalloc_rust", rev = "36142562d70868493cbed3891a4b6488e0156e88", features = ["v3"]}
 
 [build-dependencies]
-cbindgen = "0.29.2"
+cbindgen = { version = "0.29.2", default-features = false }
 
 [profile.release]
 codegen-units = 1
