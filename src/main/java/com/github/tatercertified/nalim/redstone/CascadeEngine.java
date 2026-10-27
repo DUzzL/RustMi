@@ -179,9 +179,10 @@ public final class CascadeEngine {
     private static final ThreadLocal<Session> SESSION = new ThreadLocal<>();
     /** The chain budget native/src/util/redstone/sim.rs simulates (VANILLA_MAX_CHAIN). */
     private static final int SIM_MAX_CHAINED_UPDATES = 1_000_000;
-    /** Live CollectingNeighborUpdater.addAndRun depth on this thread (engine's
-     *  own counter — the recorder's is gated on its capture toggles). */
-    private static final ThreadLocal<int[]> DRAIN_DEPTH = ThreadLocal.withInitial(() -> new int[1]);
+    /** [0]: live CollectingNeighborUpdater.addAndRun depth on this thread (engine's own
+     *  counter — the recorder's is gated on its capture toggles). [1]: addAndRun calls since
+     *  the outermost one started, i.e. vanilla's chain {@code count} for this drain. */
+    private static final ThreadLocal<int[]> DRAIN_DEPTH = ThreadLocal.withInitial(() -> new int[2]);
     /** Sticky reject latch — the R3v1 post-mortem lesson: a vanilla cascade
      *  over a non-qualifying network calls the evaluator THOUSANDS of times,
      *  and re-running the walk on every one is quadratic (87k walks, +17s).
@@ -196,7 +197,11 @@ public final class CascadeEngine {
      *  engine is off: a toggle between a drain's HEAD and RETURN must not
      *  leave this thread's depth permanently skewed. */
     public static void onDrainEnter() {
-        DRAIN_DEPTH.get()[0]++;
+        int[] d = DRAIN_DEPTH.get();
+        if (d[0]++ == 0) {
+            d[1] = 0;
+        }
+        d[1]++;
     }
 
     /** CollectingNeighborUpdater.addAndRun RETURN (ungated, see onDrainEnter). */
@@ -437,6 +442,13 @@ public final class CascadeEngine {
         var u = RustmiCramming.theUnsafe();
         if (s.cursor >= s.count) {
             abort(s, ABORT_LEFTOVER, "eval after script end @ " + pos.toShortString());
+            return false;
+        }
+        // The simulation starts its chain budget at zero, the live drain may already have
+        // used part of it: each remaining script event adds at most one addAndRun, so stop
+        // before the live drain could drop updates the script expects.
+        if ((long) DRAIN_DEPTH.get()[1] + (s.count - s.cursor) >= SIM_MAX_CHAINED_UPDATES) {
+            abort(s, ABORT_MISMATCH, "chain budget nearly used @ " + pos.toShortString());
             return false;
         }
         long base = s.outAddr + (long) s.cursor * EVENT_STRIDE;
