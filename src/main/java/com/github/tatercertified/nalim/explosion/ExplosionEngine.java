@@ -499,7 +499,14 @@ public final class ExplosionEngine {
                 for (int sx = 0; sx < c.secNx; sx++, di++) {
                     ChunkAccess chunk = cols[sz * c.secNx + sx];
                     if (chunk == null) {
-                        chunk = c.level.getChunk(c.secOx + sx, c.secOz + sz);
+                        // The box is wider than the rays reach: never load or generate a
+                        // chunk here that vanilla's rays would not touch.
+                        chunk = c.level.getChunk(c.secOx + sx, c.secOz + sz,
+                                net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
+                        if (chunk == null) {
+                            lastDisqualify = "chunk not loaded";
+                            return false;
+                        }
                         cols[sz * c.secNx + sx] = chunk;
                     }
                     int sIdx = (c.secOy + sy) - (chunk.getMinY() >> 4);
