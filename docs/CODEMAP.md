@@ -103,7 +103,13 @@ Each has a vanilla fallback per call: when a precondition is not proven, vanilla
 - Rules: the script is emitted through the same `setBlock(flags=2)` / `updateNeighborsAt`
   calls in the same order, including intermediate powers; two entry disciplines (InDrain,
   Depth0) read from the live collector depth; any foreign write to the network during
-  emission aborts the rest of the script and vanilla continues from the current state.
+  emission (checked before the write, since removal/placement side effects run inside
+  `setBlockState`), and any non-wire block changing with neighbor updates in the halo,
+  aborts the rest of the script and vanilla continues from the current state, without
+  extra re-derivation. Each span is emitted whole, like vanilla's evaluator body. No takeover
+  when `max-chained-neighbor-updates` differs from the simulated default or the drain has
+  used too much of it; the network walk only reads loaded chunks (and, on a Fabrolia region
+  worker, chunks of its own region).
 - Check: harness contraption compare and `/rustmi redstone status` (`abort{…}` counters);
   `fixtures/redstone/` (cargo tests). The fixture recorder and R2 shadow have no command:
   `enabled=true` in `config/rustmi/redstone-recorder.properties` / `redstone-shadow.properties`.
@@ -115,7 +121,10 @@ Each has a vanilla fallback per call: when a precondition is not proven, vanilla
   words via Unsafe, freed by a `Cleaner`), `WireCheck`. Rust: `rs/sections.rs` (pooled
   64-byte-aligned blocks).
 - Rules: Lithium's `chunk.serialization` must stay off (`fabric.mod.json` `lithium:options`);
-  a toggle affects new storages only.
+  a toggle affects new storages only. Only storages with at least 1024 entries (block states)
+  go native, copies (`copy()`, e.g. save snapshots) stay on the heap, and above
+  `-Drustmi.sections.maxMiB` (default a quarter of the max heap) new storages stay on the heap.
+  Native `get/set` skip vanilla's index validation like Lithium's default `chunk.no_validation`.
 - Check: `/rustmi sections wirecheck` (chunk-packet bytes, size, round trip and packing vs
   vanilla for every native section in force-loaded chunks).
 - Toggle: `config/rustmi/native-sections.properties`.

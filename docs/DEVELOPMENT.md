@@ -90,6 +90,14 @@ A/B timing.
 - **FFM** otherwise (`--enable-native-access=ALL-UNNAMED` silences the JDK warning).
 - `-Drustmi.backend=nalim` fails startup instead of falling back; `=ffm` forces FFM.
 
+## System properties
+
+- `-Drustmi.backend=auto|nalim|ffm`: see Backends.
+- `-Drustmi.sections.maxMiB=<n>`: native section memory ceiling (default a quarter of `-Xmx`).
+- `-Drustmi.test=true`: harness-only hooks (`/rustmi test …`); never set it in production.
+
+Every switch under `/rustmi` needs permission level 3; `stats`/`status` need level 2.
+
 ## Gotchas
 
 - Fabrolia couples both ways; keep these names or change both projects together:
@@ -112,6 +120,9 @@ A/B timing.
 - `fabric.mod.json` `lithium:options` are parity settings (`math.sine_lut`) and a native
   sections requirement (`chunk.serialization`); `DebugifyMixinCanceller` keeps vanilla sin/cos.
 - macOS builds use the system allocator (mimalloc needs SDK headers zig lacks).
+- The mod reads and writes memory through `sun.misc.Unsafe`. JDK 25 only warns; once a JDK
+  denies Unsafe memory access by default, launch with `--sun-misc-unsafe-memory-access=allow`
+  until those paths move to FFM.
 - The Windows, macOS and Linux arm64 libraries are cross-built but have never run on real
   machines; only Linux x86_64 is verified live.
 
