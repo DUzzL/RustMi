@@ -392,6 +392,9 @@ public final class CrammingHooks {
             }
 
             int flags = 0;
+            // Every collected row is a snapshotPushable candidate, so this bit is always set
+            // today and the kernel's "unflagged row" filter never fires; the flag stays as
+            // the ABI's way to mark rows that are only queried, not candidates.
             if (pushable) flags |= RustmiCramming.FLAG_IS_PUSHABLE;
             if (origin) flags |= RustmiCramming.FLAG_IS_ORIGIN;
             if (living) flags |= RustmiCramming.FLAG_IS_LIVING;

@@ -15,8 +15,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * R2 shadow engine: for every captured cascade burst, replay the network
- * snapshot through the Rust simulator (the artifact already proven bit-exact
- * on 498 recorded lag-machine cascades) and diff the predicted event stream
+ * snapshot through the Rust simulator (checked bit-exact against recorded
+ * cascades; fixtures/redstone keeps three of them) and diff the predicted event stream
  * against what vanilla actually did. Observation only — vanilla's results
  * are what the world keeps; this builds the live confidence corpus that
  * gates the R3 flip.

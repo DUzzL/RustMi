@@ -182,12 +182,18 @@ public final class RegionalCramming implements RegionTickHooks.Hook {
             try {
                 b.sensorEnd();   // before clear/grow can touch the retained buffer
                 b.clear();
-                POOL.add(b);
+                // A batch grown for one huge region keeps its buffers forever when pooled;
+                // let the GC take those back instead.
+                if (b.capacity <= POOLED_CAPACITY_MAX) {
+                    POOL.add(b);
+                }
             } catch (Throwable t) {
                 logFailure("release", t);
             }
         }
     }
+
+    private static final int POOLED_CAPACITY_MAX = 4096;
 
     private static void logFailure(String phase, Throwable t) {
         long now = System.currentTimeMillis();
