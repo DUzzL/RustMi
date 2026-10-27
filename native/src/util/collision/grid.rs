@@ -125,11 +125,9 @@ impl Grid<'_> {
         let a_min = self.coord_index(a_ax, min_a + EPSILON);
         let a_max = self.coord_index(a_ax, max_a - EPSILON);
         let b_min = 0i64.max(self.coord_index(b_ax, bb.min[b_ax] + EPSILON));
-        let b_max =
-            (self.n[b_ax] as i64).min(self.coord_index(b_ax, bb.max[b_ax] - EPSILON) + 1);
+        let b_max = (self.n[b_ax] as i64).min(self.coord_index(b_ax, bb.max[b_ax] - EPSILON) + 1);
         let c_min = 0i64.max(self.coord_index(c_ax, bb.min[c_ax] + EPSILON));
-        let c_max =
-            (self.n[c_ax] as i64).min(self.coord_index(c_ax, bb.max[c_ax] - EPSILON) + 1);
+        let c_max = (self.n[c_ax] as i64).min(self.coord_index(c_ax, bb.max[c_ax] - EPSILON) + 1);
         let a_size = self.n[a_ax] as i64;
 
         if max_dist > 0.0 {

@@ -310,7 +310,12 @@ pub fn compute_cramming(inputs: &[CrammingInput], outputs: &mut [CrammingOutput]
                 continue;
             }
             let out = &mut outputs[i];
-            let mut c = Collector { inputs, origin: i, count: 0, overflow: false };
+            let mut c = Collector {
+                inputs,
+                origin: i,
+                count: 0,
+                overflow: false,
+            };
             let (ex, ey, ez) = (gx[m], gy[m], gz[m]);
             let (fx, fy, fz) = (hx[m], hy[m], hz[m]);
             'scan: for &(ns, nt) in &neighbours {
@@ -341,7 +346,12 @@ pub fn compute_cramming(inputs: &[CrammingInput], outputs: &mut [CrammingOutput]
             continue; // not an origin, or already handled as a grid member
         }
         let out = &mut outputs[i];
-        let mut c = Collector { inputs, origin: i, count: 0, overflow: false };
+        let mut c = Collector {
+            inputs,
+            origin: i,
+            count: 0,
+            overflow: false,
+        };
         if oversized(e) {
             // Oversized origins out-reach the stencil — scan everything.
             for j in 0..n as u32 {
@@ -470,7 +480,11 @@ mod tests {
             for (i, (o, (count, list))) in got.iter().zip(want.iter()).enumerate() {
                 assert_eq!(o.count, *count, "world {world} row {i}: count");
                 if *count > 0 {
-                    assert_eq!(&o.slots[..*count as usize], &list[..], "world {world} row {i}: slots");
+                    assert_eq!(
+                        &o.slots[..*count as usize],
+                        &list[..],
+                        "world {world} row {i}: slots"
+                    );
                 }
             }
         }

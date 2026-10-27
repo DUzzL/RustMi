@@ -308,14 +308,8 @@ mod tests {
         rec[24..28].copy_from_slice(&2i32.to_ne_bytes()); // hasCharge, not a mob
         let caps = [1i32; N_CATEGORIES];
         unsafe {
-            let handle = ffi::oxi_spawncap_build(
-                rec.as_ptr(),
-                1,
-                std::ptr::null(),
-                0,
-                289,
-                caps.as_ptr(),
-            );
+            let handle =
+                ffi::oxi_spawncap_build(rec.as_ptr(), 1, std::ptr::null(), 0, 289, caps.as_ptr());
             assert_ne!(handle, 0);
             // vanilla addCharge drops charge 0.0, so the coincident probe stays finite
             assert_eq!(ffi::oxi_spawncap_potential(handle, 0, 64, 0, 0.7), 0.0);

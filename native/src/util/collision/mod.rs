@@ -619,13 +619,7 @@ mod tests {
             max: [1.3, 121.8, 4.0],
         };
         let curb = [0.0, 120.0, 2.0, 2.0, 122.0, 3.4];
-        let result = collide_checked(
-            [0.0, 0.0, -0.02],
-            bb,
-            0.0,
-            false,
-            &[curb],
-        );
+        let result = collide_checked([0.0, 0.0, -0.02], bb, 0.0, false, &[curb]);
         assert_eq!(result.movement[2].to_bits(), 0.0f64.to_bits());
         assert!(!result.epsilon_unstable);
     }
@@ -636,7 +630,9 @@ mod tests {
         assert!(is_nonzero_epsilon_boundary(-EPSILON));
         assert!(!is_nonzero_epsilon_boundary(0.0));
         assert!(!is_nonzero_epsilon_boundary(-0.0));
-        assert!(!is_nonzero_epsilon_boundary(f64::from_bits(EPSILON.to_bits() + 1)));
+        assert!(!is_nonzero_epsilon_boundary(f64::from_bits(
+            EPSILON.to_bits() + 1
+        )));
     }
 
     #[test]
@@ -656,13 +652,8 @@ mod tests {
             bits: &bits,
         };
         let colliders = [Collider::Grid(&grid)];
-        let result = collide_mixed_checked(
-            [0.0, 0.0, -0.022360680108198],
-            bb,
-            0.0,
-            false,
-            &colliders,
-        );
+        let result =
+            collide_mixed_checked([0.0, 0.0, -0.022360680108198], bb, 0.0, false, &colliders);
         assert!(result.epsilon_unstable);
         assert_eq!(result.movement[2].to_bits(), (3.4 - bb.min[2]).to_bits());
     }

@@ -17,7 +17,12 @@ use super::{collide_checked, collide_mixed_checked, grid, Aabb, Collider};
 /// A non-finite box, movement or step height (NaN/inf) is not modelled by the kernel;
 /// Java runs vanilla for it (return code 1).
 fn finite_inputs(bb: &Aabb, delta: &[f64; 3], step: f32) -> bool {
-    bb.min.iter().chain(&bb.max).chain(delta).all(|v| v.is_finite()) && step.is_finite()
+    bb.min
+        .iter()
+        .chain(&bb.max)
+        .chain(delta)
+        .all(|v| v.is_finite())
+        && step.is_finite()
 }
 
 /// Returns 0 on success, 1 when Java must use the exact fallback, or -1 on bad args.
@@ -70,7 +75,11 @@ pub unsafe extern "C" fn oxi_collide(
     out_ptr.write_unaligned(r.movement[0]);
     out_ptr.add(1).write_unaligned(r.movement[1]);
     out_ptr.add(2).write_unaligned(r.movement[2]);
-    if r.epsilon_unstable { 1 } else { 0 }
+    if r.epsilon_unstable {
+        1
+    } else {
+        0
+    }
 }
 
 /// C3 entry — mixed cubes + voxel grids in discovery order.
@@ -186,7 +195,11 @@ pub unsafe extern "C" fn oxi_collide2(
     out_ptr.write_unaligned(r.movement[0]);
     out_ptr.add(1).write_unaligned(r.movement[1]);
     out_ptr.add(2).write_unaligned(r.movement[2]);
-    if r.epsilon_unstable { 1 } else { 0 }
+    if r.epsilon_unstable {
+        1
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]
@@ -232,9 +245,18 @@ mod tests {
         for h in [nan_box, inf_step] {
             let mut out = [0.0; 3];
             unsafe {
-                assert_eq!(oxi_collide(h.as_ptr(), solids.as_ptr().cast(), out.as_mut_ptr()), 1);
                 assert_eq!(
-                    oxi_collide2(h.as_ptr(), solids.as_ptr().cast(), std::ptr::null(), tags.as_ptr(), out.as_mut_ptr()),
+                    oxi_collide(h.as_ptr(), solids.as_ptr().cast(), out.as_mut_ptr()),
+                    1
+                );
+                assert_eq!(
+                    oxi_collide2(
+                        h.as_ptr(),
+                        solids.as_ptr().cast(),
+                        std::ptr::null(),
+                        tags.as_ptr(),
+                        out.as_mut_ptr()
+                    ),
                     1
                 );
             }
@@ -269,7 +291,6 @@ mod tests {
         }
         assert!(v1.iter().zip(v2).all(|(a, b)| a.to_bits() == b.to_bits()));
     }
-
 
     #[test]
     fn epsilon_order_dependency_requests_java_fallback() {

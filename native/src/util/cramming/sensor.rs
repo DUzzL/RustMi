@@ -115,7 +115,8 @@ pub fn cramming_query(handle: u64, slot: usize, out: &mut [i32]) -> i32 {
 /// (OnceLock resolves concurrent first-query races).
 fn grid_of<'a>(r: &'a Retained, inputs: &[CrammingInput]) -> &'a GridIndex {
     r.grid.get_or_init(|| {
-        let mut grid: Grid = HashMap::with_capacity_and_hasher(inputs.len() / 4 + 8, Default::default());
+        let mut grid: Grid =
+            HashMap::with_capacity_and_hasher(inputs.len() / 4 + 8, Default::default());
         let mut big: Vec<u32> = Vec::new();
         let mut max_grid_half: f64 = 0.0;
         for (i, e) in inputs.iter().enumerate() {
@@ -222,7 +223,7 @@ fn batch_query(handle: u64, slot: usize, range: f64, pad: f64, mask: i32, out: &
     if overflow {
         -1
     } else {
-        out[..count].sort_unstable();   // ascending slots = collection (vanilla) order
+        out[..count].sort_unstable(); // ascending slots = collection (vanilla) order
         count as i32
     }
 }
