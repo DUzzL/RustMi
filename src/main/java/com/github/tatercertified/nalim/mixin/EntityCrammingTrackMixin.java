@@ -12,19 +12,28 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+
 /**
  * Escape detection for the cramming/sensor snapshot ({@link CrammingEscapes}).
  * {@code setBoundingBox} is the only writer of {@code Entity.bb}, so every move, resize
  * and teleport passes here. No field initializers: the constructor's own setPos runs
  * this hook before initializers would.
+ *
+ * <p>Snapshot and escape state is one volatile word, {@code tick << 2 | flags}, changed by
+ * CAS: a collector of another region (halo rows) can snapshot this entity while its own
+ * worker moves it. The collector claims the word (SNAPSHOTTING), writes the envelope and
+ * publishes it with the same CAS, so a mover reads a complete envelope or none, and an
+ * escape recorded meanwhile is never overwritten.
  */
 @Mixin(Entity.class)
 public abstract class EntityCrammingTrackMixin implements CrammingTracked {
 
     @Shadow private EntityInLevelCallback levelCallback;
 
-    @Unique private int rustmi$tick;
-    @Unique private boolean rustmi$escaped;
+    /** {@code tick << 2 | ESCAPED | SNAPSHOTTING}; 0 = never seen (ticks start at 1). */
+    @Unique private volatile long rustmi$state;
     @Unique private double rustmi$minX, rustmi$minY, rustmi$minZ, rustmi$maxX, rustmi$maxY, rustmi$maxZ;
     /** Volatile: collectors read stamp-then-position against the writer's position-then-
      *  stamp order, so a torn pair can only be (old stamp, new key) — caught at query. */
@@ -32,19 +41,41 @@ public abstract class EntityCrammingTrackMixin implements CrammingTracked {
     @Unique private boolean rustmi$hardIndexed;
     @Unique private long rustmi$hardKey;
 
+    @Unique private static final long RUSTMI$ESCAPED = 1, RUSTMI$SNAPSHOTTING = 2;
+    @Unique private static final VarHandle RUSTMI$STATE;
+
+    static {
+        try {
+            RUSTMI$STATE = MethodHandles.privateLookupIn(Entity.class, MethodHandles.lookup())
+                    .findVarHandle(Entity.class, "rustmi$state", long.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
     @Inject(method = "setBoundingBox", at = @At("HEAD"))
     private void rustmi$trackEscape(AABB next, CallbackInfo ci) {
         if (!CrammingEscapes.tracking()) {
             return;
         }
         int t = CrammingEscapes.tick();
-        if (rustmi$tick == t && (rustmi$escaped || rustmi$within(next))) {
-            return;
+        long s = rustmi$state;
+        if ((s >> 2) == t) {
+            long flags = s & 3;
+            if ((flags & RUSTMI$ESCAPED) != 0 || (flags == 0 && rustmi$within(next))) {
+                return;
+            }
         }
-        // Not snapshotted this tick, or drifted out of the snapshot tolerance.
+        // Not snapshotted this tick, being snapshotted right now, or drifted out of the
+        // snapshot tolerance.
         if (CrammingEscapes.offer((Entity) (Object) this)) {
-            rustmi$tick = t;
-            rustmi$escaped = true;
+            for (;;) {
+                s = rustmi$state;
+                long keep = (s >> 2) == t ? s & RUSTMI$SNAPSHOTTING : 0;
+                if (RUSTMI$STATE.compareAndSet(this, s, ((long) t << 2) | RUSTMI$ESCAPED | keep)) {
+                    return;
+                }
+            }
         }
     }
 
@@ -56,23 +87,38 @@ public abstract class EntityCrammingTrackMixin implements CrammingTracked {
 
     @Override
     public void rustmi$snapshotted(int tick, AABB box) {
-        if (rustmi$tick == tick) {
-            return;   // first snapshot of the tick wins; an escape stays an escape
+        long claimed = ((long) tick << 2) | RUSTMI$SNAPSHOTTING;
+        for (;;) {
+            long s = rustmi$state;
+            if ((s >> 2) == tick) {
+                return;   // first snapshot of the tick wins; an escape stays an escape
+            }
+            if (RUSTMI$STATE.compareAndSet(this, s, claimed)) {
+                break;
+            }
         }
         double tol = CrammingEscapes.tolerance();
-        rustmi$tick = tick;
-        rustmi$escaped = false;
         rustmi$minX = box.minX - tol;
         rustmi$minY = box.minY - tol;
         rustmi$minZ = box.minZ - tol;
         rustmi$maxX = box.maxX + tol;
         rustmi$maxY = box.maxY + tol;
         rustmi$maxZ = box.maxZ + tol;
+        // Publish; a mover that escaped meanwhile set ESCAPED, which must survive.
+        if (!RUSTMI$STATE.compareAndSet(this, claimed, (long) tick << 2)) {
+            for (;;) {
+                long s = rustmi$state;
+                if (RUSTMI$STATE.compareAndSet(this, s, s & ~RUSTMI$SNAPSHOTTING)) {
+                    return;
+                }
+            }
+        }
     }
 
     @Override
     public boolean rustmi$escaped(int tick) {
-        return rustmi$tick != tick || rustmi$escaped;
+        long s = rustmi$state;
+        return (s >> 2) != tick || (s & 3) != 0;
     }
 
     @Override
