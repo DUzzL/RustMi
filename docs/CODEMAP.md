@@ -14,7 +14,7 @@ Nalim library (`one.nalim`, `../nalim`).
      (`librustmi_linux_x86.so`, `rustmi_windows_arm64.dll`, …), extracts it
      to `libraries/rustmi/` when missing or its SHA-256 differs from the bundled `.hash`,
      rejects musl JVMs, sets `-Drustmi.native.path`;
-   - `N/NativeBackend.select`: Nalim or FFM (rules in AGENTS.md), then a layout probe
+   - `N/NativeBackend.select`: Nalim or FFM (rules in `docs/DEVELOPMENT.md`), then a layout probe
      (cramming record sizes 64/512 from both sides);
    - `N/cramming/CrammingHooks.register`, `N/spawncap/SpawnCapHooks.register`.
    Any `RuntimeException` is rethrown as `Error` so startup stops.

@@ -12,7 +12,7 @@ build/
 /logs/
 /run/
 
-# Local data (see AGENTS.md): parity stand and release jars
+# Local data (see docs/DEVELOPMENT.md): parity stand and release jars
 /stand/
 /release/
 
@@ -22,3 +22,8 @@ build/
 /.vs/
 *.iml
 __pycache__/
+
+# Local agent instructions and audit output (not part of the project)
+/AGENTS.md
+/CLAUDE.md
+/audit-reports/

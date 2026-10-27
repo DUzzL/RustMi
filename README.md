@@ -6,7 +6,8 @@ redstone wire cascades, off-heap block storage, and (with Fabrolia) spawn caps. 
 the native library for Linux, Windows and macOS on x86_64 and arm64; only Linux x86_64 has
 been run live so far.
 
-- **Working on the code (people and AI agents): read [`AGENTS.md`](AGENTS.md) first.**
+- **Working on the code: read [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) first** (contract,
+  build, harness, backends, release).
 - Code map and each feature's vanilla rules: [`docs/CODEMAP.md`](docs/CODEMAP.md).
 - Parity/perf harness: [`tools/parity/`](tools/parity) (`setup.sh`, then `harness.sh`).
 

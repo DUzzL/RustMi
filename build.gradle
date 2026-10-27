@@ -17,7 +17,7 @@ repositories {
     flatDir { dirs 'libs' }
 }
 
-// Jars in libs/ are pinned by SHA-256 (see AGENTS.md for how to update them).
+// Jars in libs/ are pinned by SHA-256 (see docs/DEVELOPMENT.md for how to update them).
 def vendoredLibraries = [
         // Nalim 1.2.1-patched-autoinline, built from ../nalim (one.nalim.*).
         [file: file('libs/nalim.jar'),

@@ -1,4 +1,4 @@
-# Rustmi — agent guide
+# Rustmi development guide
 
 Rustmi is a server-side Fabric mod for Minecraft 26.3 (Java 25) that moves hot vanilla
 paths — block collision, entity cramming and sensors, explosions, redstone wire, block
@@ -35,6 +35,8 @@ API. It runs on a ~35-player production server next to Fabrolia (`../Fabrolia`).
 
 ## Build and test
 
+The build and the harness need a Linux host (WSL2 works); the scripts use GNU tools.
+
 ```bash
 tools/setup-toolchain.sh                 # once: rustup targets, cargo-zigbuild, zig 0.14.1
 export JAVA_HOME=/path/to/jdk-25
@@ -55,12 +57,14 @@ tools/parity/harness.sh                  # ~5 min; prints METRIC vanilla_failure
 RUSTMI_BACKENDS=ffm tools/parity/harness.sh   # one backend only
 ```
 
-The harness builds the jar, records vanilla (`ref-V`) and Lithium+Fabric API+Fabrolia
-(`ref-L`) references (regenerated when the server, stack jars or `drive.py` change), then
-runs Rustmi with each backend forced (`R-<backend>`, `LR-<backend>`): worldgen and a
-redstone contraption compared section by section, every shadow mode, `wirecheck`, perf and
-RAM. Logs: `stand/logs/`; per-run data: `stand/runs/*/result.json`. `tools/parity/ab.py`
-toggles features on a crowd workload for A/B timing.
+`setup.sh` takes the Fabrolia jar from `../Fabrolia/release/` or from `FABROLIA_JAR`
+(`libs/fabrolia-compile.jar` is the full 0.2.38 release jar). The harness builds the jar,
+records vanilla (`ref-V`) and Lithium+Fabric API+Fabrolia (`ref-L`) references (regenerated
+when the server, stack jars or `drive.py` change), then runs Rustmi with each backend forced
+(`R-<backend>`, `LR-<backend>`): worldgen and a redstone contraption compared section by
+section, every shadow mode, `wirecheck`, perf and RAM. Logs: `stand/logs/`; per-run data:
+`stand/runs/*/result.json`. `tools/parity/ab.py` toggles features on a crowd workload for
+A/B timing.
 
 ## Native surface
 
@@ -71,6 +75,7 @@ toggles features on a crowd workload for A/B timing.
   Callers use `RustmiLib.name(...)`; the build regenerates the facade and FFM bindings.
 - `@Critical` (FFM call without a thread-state transition) only for short, bounded functions
   that never wait on a lock another call may hold long; everything else stays plain.
+  Under Nalim every call behaves like a critical one.
 - Rust exports are `#[no_mangle] pub extern "C"`; `cargo build` rewrites `native/lib.h`,
   commit it with the change so the ABI diff is reviewable.
 
