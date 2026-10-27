@@ -39,10 +39,12 @@ public final class RustLocalCapProvider implements LocalCapBridge.Provider {
     // flags i32@24 (bit0 isMob, bit1 hasCharge), pad@28.
     private static final int ENT_STRIDE = 32;
 
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("Rustmi");
+
     private volatile boolean enabled = true;
 
-    // Marshalling buffers — buildArena runs on the server thread (levels tick sequentially), and
-    // Rust copies the input into the arena during build(), so a single reused buffer is safe.
+    // Marshalling buffers, reused across calls; Rust copies the input into the arena during
+    // build(). buildArena is synchronized so two levels building at once cannot share them.
     private ByteBuffer playerBuf;
     private ByteBuffer capsBuf;
     private ByteBuffer entBuf;
@@ -73,9 +75,18 @@ public final class RustLocalCapProvider implements LocalCapBridge.Provider {
         return true;
     }
     @Override
-    public long buildArena(ServerLevel level, long[] mobChunks, int[] mobCategories, int mobCount) {
+    public synchronized long buildArena(ServerLevel level, long[] mobChunks, int[] mobCategories, int mobCount) {
         if (!enabled) {
             return 0L; // decline → Fabrolia uses its Java LocalMobCapCalculator
+        }
+        if (MobCategory.values().length != SpawnCap.N_CATEGORIES) {
+            // The native arena has a fixed category count; a new MobCategory would shift
+            // every cap and count. Checked here, not at registration (onLoad must not load
+            // Minecraft classes).
+            enabled = false;
+            LOGGER.error("[spawncap] {} mob categories, native arena expects {} — Rust local cap disabled",
+                    MobCategory.values().length, SpawnCap.N_CATEGORIES);
+            return 0L;
         }
         List<ServerPlayer> players = level.players();
         int np = players.size();

@@ -25,6 +25,9 @@ import java.nio.ByteBuffer;
  */
 public final class SpawnCap {
 
+    /** MobCategory count the native arena is built for (N_CATEGORIES in native/src/util/spawncap/mod.rs). */
+    public static final int N_CATEGORIES = 8;
+
     private SpawnCap() {}
 
     private static final org.slf4j.Logger LOGGER =

@@ -19,10 +19,15 @@ public final class DistanceSort {
 
     private DistanceSort() {}
 
+    private static volatile boolean failed;
+
     /** @return true on success; false → caller must use its Java fallback. */
     public static boolean sort(ByteBuffer xs, ByteBuffer ys, ByteBuffer zs,
                                double tx, double ty, double tz,
                                int n, ByteBuffer perm) {
+        if (failed) {
+            return false;
+        }
         try {
             return RustmiLib.oxi_distance_sort(
                     RustmiCramming.addressOf(xs),
@@ -31,6 +36,10 @@ public final class DistanceSort {
                     tx, ty, tz, n,
                     RustmiCramming.addressOf(perm)) == 0;
         } catch (Throwable t) {
+            // Was swallowed silently on every call; report once and stay on the Java sort.
+            failed = true;
+            org.slf4j.LoggerFactory.getLogger("Rustmi").error(
+                    "[distance-sort] native sort failed — Fabrolia uses its Java sort from now on", t);
             return false;
         }
     }
