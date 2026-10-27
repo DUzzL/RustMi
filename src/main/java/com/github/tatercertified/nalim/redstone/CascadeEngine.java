@@ -179,6 +179,8 @@ public final class CascadeEngine {
     }
 
     private static final ThreadLocal<Session> SESSION = new ThreadLocal<>();
+    /** The chain budget native/src/util/redstone/sim.rs simulates (VANILLA_MAX_CHAIN). */
+    private static final int SIM_MAX_CHAINED_UPDATES = 1_000_000;
     /** Live CollectingNeighborUpdater.addAndRun depth on this thread (engine's
      *  own counter — the recorder's is gated on its capture toggles). */
     private static final ThreadLocal<int[]> DRAIN_DEPTH = ThreadLocal.withInitial(() -> new int[1]);
@@ -314,6 +316,12 @@ public final class CascadeEngine {
         // The removal path evaluates the wire with its old state after the block is gone
         // (affectNeighborsAfterRemoval); the network model cannot describe that position.
         if (level.getBlockState(pos) != state) {
+            return false;
+        }
+        // The Rust collector simulates vanilla's default chain budget; with another
+        // max-chained-neighbor-updates the live drain drops updates the script expects.
+        var server = level.getServer();
+        if (server == null || server.getMaxChainedNeighborUpdates() != SIM_MAX_CHAINED_UPDATES) {
             return false;
         }
         long t0 = System.nanoTime();
