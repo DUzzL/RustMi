@@ -188,6 +188,13 @@ public final class CascadeEngine {
      *  and re-running the walk on every one is quadratic (87k walks, +17s).
      *  Any bail latches takeover attempts off until the drain unwinds. */
     private static final ThreadLocal<boolean[]> REJECT_LATCH = ThreadLocal.withInitial(() -> new boolean[1]);
+    /** Members of networks found too small during this drain. Closure membership depends only
+     *  on topology and every member's closure is a subset of the walked one, so all of them
+     *  would bail too. Cleared at drain end and on topology writes this thread sees; a stale
+     *  entry can only cost a missed takeover (vanilla runs), never a wrong result. */
+    private static final ThreadLocal<java.util.HashSet<BlockPos>> SMALL_NETS =
+            ThreadLocal.withInitial(java.util.HashSet::new);
+    private static final int SMALL_NETS_CAP = 256;
 
     // ─────────────────────────────────────────────────────────────────────
     // Hooks
@@ -209,6 +216,10 @@ public final class CascadeEngine {
         int[] d = DRAIN_DEPTH.get();
         if (d[0] > 0 && --d[0] == 0) {
             REJECT_LATCH.get()[0] = false;
+            java.util.HashSet<BlockPos> small = SMALL_NETS.get();
+            if (!small.isEmpty()) {
+                small.clear();
+            }
             Session s = SESSION.get();
             if (s != null && !s.entryEmitting) {
                 endSession(s);
@@ -334,6 +345,10 @@ public final class CascadeEngine {
             REJECT_LATCH.get()[0] = true;   // holds for every evaluation of this drain
             return false;
         }
+        if (SMALL_NETS.get().contains(pos)) {
+            BAIL_SMALL.incrementAndGet();
+            return false;
+        }
         long t0 = System.nanoTime();
         NetworkCache.Cached cached = NetworkCache.lookup(level, pos, signals);
         Map<BlockPos, CascadeRecorder.Node> network;
@@ -350,8 +365,13 @@ public final class CascadeEngine {
             }
             if (network.size() < MIN_NETWORK) {
                 BAIL_SMALL.incrementAndGet();
-                // No latch: tiny walks are cheap, and unrelated small nets
-                // inside one drain must each get their own chance.
+                // No latch: unrelated small nets inside one drain must each get their own
+                // chance. Remember this one so its other members skip the walk.
+                java.util.HashSet<BlockPos> small = SMALL_NETS.get();
+                if (small.size() + network.size() > SMALL_NETS_CAP) {
+                    small.clear();
+                }
+                small.addAll(network.keySet());
                 return false;
             }
             cached = NetworkCache.store(level, network);
@@ -591,6 +611,10 @@ public final class CascadeEngine {
                         + newState.getBlock().getDescriptionId() + " @ " + pos.toShortString());
             }
             return;
+        }
+        java.util.HashSet<BlockPos> small = SMALL_NETS.get();
+        if (!small.isEmpty()) {
+            small.clear();   // topology changed: a remembered small network may have grown
         }
         NetworkCache.onTopologyWriteStart(level, pos, oldState, newState);
         if (inSession) {
